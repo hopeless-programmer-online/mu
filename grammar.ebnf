@@ -1,25 +1,25 @@
-file  ::= SPC? expr SPC?
+file  ::= SPC? stats
 
-expr  ::= bin | un | term
+stats ::= (stat SPC?)*
+stat  ::= if | ret | expr
 
-un    ::= min | plus | star | slsh
+    if    ::= "if" SPC? expr SPC? ":" SPC? stat
+    ret   ::= "return" SPC? expr
 
-min   ::= "-" SPC? expr
-plus  ::= "+" SPC? expr
-star  ::= "*" SPC? expr
-slsh  ::= "/" SPC? expr
+prog  ::= "program" SPC? args SPC? expr
+    arg   ::= name
+    args  ::= "(" SPC? ( arg SPC? ("," SPC? arg SPC?)* )? ")"
 
-bin   ::= div | mul | sub | add
-div   ::= term SPC? "/" SPC? expr
-mul   ::= term SPC? "*" SPC? expr
-sub   ::= term SPC? "-" SPC? expr
-add   ::= term SPC? "+" SPC? expr
+expr  ::= ass | call | prog | block | term
+    block ::= "{" SPC? (stat SPC?)* "}"
+    ass   ::= name SPC? ("," SPC? name SPC?)* "=" SPC? expr
+    call  ::= term "(" SPC? (expr SPC? ("," SPC? expr SPC?)* )? ")"
 
-term  ::= name | lit | group
-group ::= "(" SPC? expr SPC? ")"
-name  ::= WORD
-lit   ::= int
-int   ::= [0-9](SPC? [0-9])*
+term  ::= name | LIT | group
+    group ::= "(" SPC? expr SPC? ")"
+    name  ::= WORD
+    LIT   ::= int
+    int   ::= [0-9](SPC? [0-9])*
 
 WORD  ::= [a-zA-Z_] [a-zA-Z0-9_]*
-SPC   ::= [ ]+
+SPC   ::= [ \n\r]+
