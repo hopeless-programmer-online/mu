@@ -10,15 +10,15 @@ prog  ::= "program" SPC? args SPC? expr
     arg   ::= name
     args  ::= "(" SPC? ( arg SPC? ("," SPC? arg SPC?)* )? ")"
 
-expr  ::= ass | call | prog | block | term
+expr  ::= prog | ass | call | block | term
     block ::= "{" SPC? (stat SPC?)* "}"
     ass   ::= name SPC? ("," SPC? name SPC?)* "=" SPC? expr
     call  ::= term "(" SPC? (expr SPC? ("," SPC? expr SPC?)* )? ")"
 
-term  ::= name | LIT | group
+term  ::= name | lit | group
     group ::= "(" SPC? expr SPC? ")"
     name  ::= WORD
-    LIT   ::= int
+    lit   ::= int
     int   ::= [0-9](SPC? [0-9])*
 
 WORD  ::= [a-zA-Z_] [a-zA-Z0-9_]*
