@@ -4,5 +4,6 @@
         "strict"           : true,
         "skipLibCheck"     : true,
         "moduleResolution" : "Node",
+        "esModuleInterop"  : true,
     }
 }

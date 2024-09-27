@@ -7,6 +7,10 @@ export type File = {
     statements : Statement[]
 }
 
+export type Statement = Expression | Block | Return | If
+
+export type Expression = Name | Integer | Call | Empty | Assignment | ExpressionList | Program
+
 export type Name = {
     type : `name`
     text : string
@@ -17,27 +21,37 @@ export type Integer = {
     text : string
 }
 
-export type Block = {
-    type       : `block`
-    statements : Statement[]
-}
-
-export type Program = {
-    type      : `program`
-    arguments : Name[]
-    body      : Expression
-}
-
 export type Call = {
-    type       : `call`
-    target     : Expression
-    parameters : Expression[]
+    type   : `call`
+    target : Expression
+    input  : Expression
+}
+
+export type Empty = {
+    type : `empty`
 }
 
 export type Assignment = {
-    type    : `assignment`
-    outputs : Name[]
-    target  : Expression
+    type   : `assignment`
+    output : Target
+    input  : Expression
+}
+
+export type ExpressionList = {
+    type        : `expression_list`
+    expressions : Expression[]
+}
+
+export type Target = Name | TargetList | Empty
+
+export type TargetList = {
+    type    : `target_list`
+    targets : Target[]
+}
+
+export type Block = {
+    type       : `block`
+    statements : Statement[]
 }
 
 export type Return = {
@@ -51,9 +65,11 @@ export type If = {
     then      : Statement
 }
 
-export type Expression = Name | Call | Assignment | Program | Block | Integer
-
-export type Statement = Expression | Return | If
+export type Program = {
+    type     : `program`
+    argument : Target
+    body     : Statement
+}
 
 export class Analyzer {
     public static async create() {
@@ -78,34 +94,188 @@ export class Analyzer {
     }
 
     private check_statements(token : IToken) {
-        if (token.type !== `stats`) throw new Error
+        if (token.type !== `statements`) throw new Error
 
         return token.children.map(child => this.check_statement(child))
     }
 
     private check_statement(token : IToken) : Statement {
-        if (token.type !== `stat`) throw new Error
+        if (token.type !== `statement`) throw new Error
         if (token.children.length !== 1) throw new Error
 
         token = token.children[0]
 
 
         switch (token.type) {
-            case `expr` : return this.check_expression(token)
-            case `ret`  : return this.check_return(token)
-            case `if`   : return this.check_if(token)
+            case `expression` : return this.check_expression(token)
+            case `return`     : return this.check_return(token)
+            case `if`         : return this.check_if(token)
+            case `block`      : return this.check_block(token)
         }
 
         throw new Error(`Unexpected token type: ${token.type}`)
     }
 
-    private check_return(token : IToken) : Return {
-        if (token.type !== `ret`) throw new Error
+    private check_expression = (token : IToken) => {
+        if (token.type !== `expression`) throw new Error
         if (token.children.length !== 1) throw new Error
+
+        token = token.children[0]
+
+        switch (token.type) {
+            case `e_terminal` : return this.check_expression_terminal(token)
+            case `call`       : return this.check_call(token)
+            case `assignment` : return this.check_assignment(token)
+            case `program`    : return this.check_program(token)
+            case `e_list`     : return this.check_expression_list(token)
+        }
+
+        throw new Error(`Unsupported expression type: ${token.type}`)
+    }
+
+    private check_expression_terminal(token : IToken) {
+        if (token.type !== `e_terminal`) throw new Error
+        if (token.children.length !== 1) throw new Error
+
+        token = token.children[0]
+
+        switch (token.type) {
+            case `name`    : return this.check_name(token)
+            case `literal` : return this.check_literal(token)
+            case `e_group` : return this.check_expression_group(token)
+        }
+
+        throw new Error
+    }
+
+    private check_name(token : IToken) : Name {
+        if (token.type !== `name`) throw new Error
+
+        return { type : `name`, text : token.text }
+    }
+
+    private check_literal(token : IToken) {
+        if (token.type !== `literal`) throw new Error
+        if (token.children.length !== 1) throw new Error
+
+        token = token.children[0]
+
+        switch (token.type) {
+            case `integer` : return this.check_integer(token)
+        }
+
+        throw new Error
+    }
+
+    private check_integer(token : IToken) : Integer {
+        if (token.type !== `integer`) throw new Error
+
+        return { type : `integer`, text : token.text }
+    }
+
+    private check_expression_group(token : IToken) : Expression {
+        if (token.type !== `e_group`) throw new Error
+        if (token.children.length === 0) return { type : `empty` }
+        if (token.children.length !== 1) throw new Error
+
+        return this.check_expression(token.children[0])
+    }
+
+    private check_call(token : IToken) : Call {
+        if (token.type !== `call`) throw new Error
+        if (token.children.length !== 2) throw new Error
+
+        const target = this.check_expression_terminal(token.children[0])
+        const input = this.check_expression_group(token.children[1])
+
+        return { type : `call`, target, input }
+    }
+
+    private check_assignment(token : IToken) : Assignment {
+        if (token.type !== `assignment`) throw new Error
+        if (token.children.length != 2) throw new Error
+
+        const output = this.check_target(token.children[0])
+        const input  = this.check_expression(token.children[1])
+
+        return { type : `assignment`, output, input }
+    }
+
+    private check_expression_list(token : IToken) : ExpressionList {
+        if (token.type !== `e_list`) throw new Error
+        if (token.children.length < 1) throw new Error
+
+        const first = this.check_expression_terminal(token.children[0])
+        const rest = token.children.slice(1).map(this.check_expression)
+
+        return { type : `expression_list`, expressions : [ first, ...rest ] }
+    }
+
+    private check_target = (token : IToken) : Target => {
+        if (token.type !== `target`) throw new Error
+        if (token.children.length !== 1) throw new Error
+
+        token = token.children[0]
+
+        switch (token.type) {
+            case `t_terminal` : return this.check_target_terminal(token)
+            case `t_list`     : return this.check_target_list(token)
+        }
+
+        throw new Error
+    }
+
+    private check_target_terminal(token : IToken) : Target {
+        if (token.type !== `t_terminal`) throw new Error
+        if (token.children.length !== 1) throw new Error
+
+        token = token.children[0]
+
+        switch (token.type) {
+            case `name`    : return this.check_name(token)
+            case `t_group` : return this.check_target_group(token)
+        }
+
+        throw new Error
+    }
+
+    private check_target_group(token : IToken) : Target {
+        if (token.type !== `t_group`) throw new Error
+        if (token.children.length === 0) return { type : `empty` }
+        if (token.children.length !== 1) throw new Error
+
+        return this.check_target(token.children[0])
+    }
+
+    private check_target_list(token : IToken) : TargetList {
+        if (token.type !== `t_list`) throw new Error
+        if (token.children.length < 1) throw new Error
+
+        const first = this.check_target_terminal(token.children[0])
+        const rest = token.children.slice(1).map(this.check_target)
+
+        return { type : `target_list`, targets : [ first, ...rest ] }
+    }
+
+    private check_block(token : IToken) : Block {
+        if (token.type !== `block`) throw new Error
+
+        return {
+            type       : `block`,
+            statements : token.children.map(child => this.check_statement(child)),
+        }
+    }
+
+    private check_return(token : IToken) : Return {
+        if (token.type !== `return`) throw new Error
 
         return {
             type       : `return`,
-            expression : this.check_expression(token.children[0]),
+            expression : (
+                token.children.length === 0 ? { type : `empty` } :
+                token.children.length === 1 ? this.check_expression(token.children[0]) :
+                (() => { throw new Error })()
+            ),
         }
     }
 
@@ -120,112 +290,14 @@ export class Analyzer {
         }
     }
 
-    private check_expression(token : IToken) {
-        if (token.type !== `expr`) throw new Error
-        if (token.children.length !== 1) throw new Error
-
-        token = token.children[0]
-
-        switch (token.type) {
-            case `term`  : return this.check_terminal(token)
-            case `call`  : return this.check_call(token)
-            case `ass`   : return this.check_assignment(token)
-            case `prog`  : return this.check_program(token)
-            case `block` : return this.check_block(token)
-        }
-
-        throw new Error
-    }
-
-    private check_terminal(token : IToken) {
-        if (token.type !== `term`) throw new Error
-        if (token.children.length !== 1) throw new Error
-
-        token = token.children[0]
-
-        switch (token.type) {
-            case `name`: return this.check_name(token)
-            case `lit` : return this.check_literal(token)
-        }
-
-        throw new Error
-    }
-
-    private check_call(token : IToken) : Call {
-        if (token.type !== `call`) throw new Error
-        if (token.children.length < 1) throw new Error
-
-        const target = this.check_terminal(token.children[0])
-        const parameters = token.children.slice(1).map(child => this.check_expression(child))
-
-        return { type : `call`, target, parameters }
-    }
-
-    private check_assignment(token : IToken) : Assignment {
-        if (token.type !== `ass`) throw new Error
-        if (token.children.length < 2) throw new Error
-
-        const outputs = token.children.slice(0, -1).map(child => this.check_name(child))
-        const target = this.check_expression(token.children[token.children.length - 1])
-
-        return { type : `assignment`, outputs, target }
-    }
-
-    private check_name(token : IToken) : Name {
-        if (token.type !== `name`) throw new Error
-
-        return { type : `name`, text : token.text }
-    }
-
-    private check_literal(token : IToken) {
-        if (token.type !== `lit`) throw new Error
-        if (token.children.length !== 1) throw new Error
-
-        token = token.children[0]
-
-        switch (token.type) {
-            case `int` : return this.check_integer(token)
-        }
-
-        throw new Error
-    }
-
-    private check_integer(token : IToken) : Integer {
-        if (token.type !== `int`) throw new Error
-
-        return { type : `integer`, text : token.text }
-    }
-
     private check_program(token : IToken) : Program {
-        if (token.type !== `prog`) throw new Error
+        if (token.type !== `program`) throw new Error
         if (token.children.length != 2) throw new Error
 
         return {
-            type      : `program`,
-            arguments : this.check_arguments(token.children[0]),
-            body      : this.check_expression(token.children[1]),
-        }
-    }
-
-    private check_arguments(token : IToken) {
-        if (token.type !== `args`) throw new Error
-
-        return token.children.map(child => this.check_argument(child))
-    }
-
-    private check_argument(token : IToken) {
-        if (token.type !== `arg`) throw new Error
-        if (token.children.length != 1) throw new Error
-
-        return this.check_name(token.children[0])
-    }
-
-    private check_block(token : IToken) : Block {
-        if (token.type !== `block`) throw new Error
-
-        return {
-            type       : `block`,
-            statements : token.children.map(child => this.check_statement(child)),
+            type     : `program`,
+            argument : this.check_target_group(token.children[0]),
+            body     : this.check_statement(token.children[1]),
         }
     }
 

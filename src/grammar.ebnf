@@ -1,25 +1,28 @@
-file  ::= SPC? stats
+file       ::= SPACE? statements SPACE? EOF
 
-stats ::= (stat SPC?)*
-stat  ::= if | ret | expr
+statements ::= (statement (SPACE statement)*)?
+statement  ::= if | return | block | expression
 
-    if    ::= "if" SPC? expr SPC? ":" SPC? stat
-    ret   ::= "return" SPC? expr
+if         ::= "if" SPACE? expression SPACE? "then" SPACE? statement
+return     ::= "return" SPACE? expression?
+block      ::= "{" SPACE? (statement (SPACE statement)* SPACE?)? "}"
 
-prog  ::= "program" SPC? args SPC? expr
-    arg   ::= name
-    args  ::= "(" SPC? ( arg SPC? ("," SPC? arg SPC?)* )? ")"
+expression ::= program | call | assignment | e_list | e_terminal
+program    ::= "program" SPACE? t_group SPACE? statement
+call       ::= e_terminal SPACE? e_group
+assignment ::= target SPACE? "=" SPACE? expression
+e_terminal ::= e_group | name | literal
+e_group    ::= "(" SPACE? (expression SPACE?)? ")"
+e_list     ::= e_terminal SPACE? "," (SPACE? expression (SPACE? "," SPACE? expression)* SPACE? ","?)?
 
-expr  ::= prog | ass | call | block | term
-    block ::= "{" SPC? (stat SPC?)* "}"
-    ass   ::= name SPC? ("," SPC? name SPC?)* "=" SPC? expr
-    call  ::= term "(" SPC? (expr SPC? ("," SPC? expr SPC?)* )? ")"
+target     ::= t_list | t_terminal
+t_terminal ::= t_group | name
+t_group    ::= "(" SPACE? (target SPACE?)? ")"
+t_list     ::= t_terminal SPACE? "," (SPACE? target (SPACE? "," SPACE? target)* SPACE? ","?)?
 
-term  ::= name | lit | group
-    group ::= "(" SPC? expr SPC? ")"
-    name  ::= WORD
-    lit   ::= int
-    int   ::= [0-9](SPC? [0-9])*
+name       ::= WORD
+literal    ::= integer
+integer    ::= [0-9](SPACE? [0-9])*
 
-WORD  ::= [a-zA-Z_] [a-zA-Z0-9_]*
-SPC   ::= [ \n\r]+
+WORD       ::= [a-zA-Z_] [a-zA-Z0-9_]*
+SPACE      ::= [ \t\n\r]+
