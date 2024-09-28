@@ -6,6 +6,6 @@ async function parse(text : string) {
     const root = syntax_analyzer.analyze_text(text)
     const semantic_analyzer = new SemanticAnalyzer
 
-    semantic_analyzer.analyze_file(root)
+    // semantic_analyzer.analyze_file(root)
 }
 

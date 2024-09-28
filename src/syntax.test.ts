@@ -3,195 +3,90 @@ import { Analyzer } from './syntax'
 async function parse(text : string) {
     const analyzer = await Analyzer.create()
 
-    return analyzer.analyze_text(text)
+    return analyzer.analyze_text(text).toString()
 }
 
+it(`Empty file`, async () => {
+    expect(await parse(``)).toBe(
+        `\n`
+    )
+})
+
 it(`Variable`, async () => {
-    expect(await parse(`hello`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : { type : `name`, text : `hello` },
-            },
-        ],
-    })
+    expect(await parse(`hello`)).toBe(
+        `hello\n`
+    )
 })
 
 it(`Integer literal`, async () => {
-    expect(await parse(`123`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : { type : `integer`, text : `123` },
-            }
-        ],
-    })
+    expect(await parse(`123`)).toBe(
+        `123\n`
+    )
 })
 
 it(`Expression group`, async () => {
-    expect(await parse(`(123)`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : { type : `integer`, text : `123` },
-            },
-        ],
-    })
+    expect(await parse(`(123)`)).toBe(
+        `123\n`
+    )
 })
 
 it(`Call without inputs`, async () => {
-    expect(await parse(`f()`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : {
-                    type   : `call`,
-                    target : { type : `name`, text : `f` },
-                    input  : { type : `empty` },
-                },
-            },
-        ],
-    })
+    expect(await parse(`f()`)).toBe(
+        `f()\n`
+    )
 })
 
 it(`Call with single input`, async () => {
-    expect(await parse(`f(x)`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : {
-                    type   : `call`,
-                    target : { type : `name`, text : `f` },
-                    input  : { type : `name`, text : `x` },
-                },
-            }
-        ],
-    })
+    expect(await parse(`f(x)`)).toBe(
+        `f(x)\n`
+    )
 })
 
 it(`Call with two inputs`, async () => {
-    expect(await parse(`f(x, y)`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : {
-                    type   : `call`,
-                    target : { type : `name`, text : `f` },
-                    input  : {
-                        type        : `expression_list`,
-                        expressions : [
-                            { type : `name`, text : `x` },
-                            { type : `name`, text : `y` },
-                        ],
-                    },
-                },
-            }
-        ],
-    })
+    expect(await parse(`f(x, y)`)).toBe(
+        `f(x, y)\n`
+    )
 })
 
 it(`Single assignment`, async () => {
-    expect(await parse(`x = x`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : {
-                    type   : `assignment`,
-                    output : { type : `name`, text : `x` },
-                    input  : { type : `name`, text : `x` },
-                },
-            },
-        ],
-    })
+    expect(await parse(`x = x`)).toBe(
+        `x = x\n`
+    )
 })
 
 it(`Group assignment`, async () => {
-    expect(await parse(`(x) = x`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : {
-                    type   : `assignment`,
-                    output : { type : `name`, text : `x` },
-                    input  : { type : `name`, text : `x` },
-                },
-            },
-        ],
-    })
+    expect(await parse(`(x) = x`)).toBe(
+        `x = x\n`
+    )
 })
 
 it(`Double assignment`, async () => {
-    expect(await parse(`x, y = x`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : {
-                    type   : `assignment`,
-                    output : {
-                        type    : `target_list`,
-                        targets : [
-                            { type : `name`, text : `x` },
-                            { type : `name`, text : `y` },
-                        ],
-                    },
-                    input  : { type : `name`, text : `x` },
-                },
-            },
-        ],
-    })
+    expect(await parse(`x, y = x`)).toBe(
+        `x, y = x\n`
+    )
 })
 
 it(`Empty block`, async () => {
-    expect(await parse(`{}`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {
-                type       : `block`,
-                statements : [],
-            },
-        ],
-    })
+    expect(await parse(`{}`)).toBe(
+        `{\n` +
+        `}\n`
+    )
 })
 
 it(`Return`, async () => {
-    expect(await parse(`return`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {
-                type       : `return`,
-                expression : { type : `empty` } ,
-            },
-        ],
-    })
+    expect(await parse(`return`)).toBe(
+        `return\n`
+    )
 })
 
 it(`Branching`, async () => {
-    expect(await parse(`if x then y`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {
-                type      : `if`,
-                condition : { type : `name`, text : `x` },
-                then      : {
-                    type       : `expression_statement`,
-                    expression : { type : `name`, text : `y` },
-                },
-            },
-        ],
-    })
+    expect(await parse(`if x then y`)).toBe(
+        `if x then y\n`
+    )
 })
 
 it(`Empty program`, async () => {
-    expect(await parse(`program() return`)).toMatchObject({
-        type       : `file`,
-        statements : [
-            {   type       : `expression_statement`,
-                expression : {
-                    type     : `program`,
-                    argument : { type : `empty` },
-                    body     : { type : `return`, expression : { type : `empty` } },
-                },
-            },
-        ],
-    })
+    expect(await parse(`program() return`)).toBe(
+        `program() return\n`
+    )
 })

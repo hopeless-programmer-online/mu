@@ -1,11 +1,11 @@
-file       ::= SPACE? statements SPACE? EOF
+file       ::= SPACE? (statements SPACE?)? EOF
 
 statements ::= (statement (SPACE statement)*)?
 statement  ::= if | return | block | expression
 
 if         ::= "if" SPACE? expression SPACE? "then" SPACE? statement
 return     ::= "return" SPACE? expression?
-block      ::= "{" SPACE? (statement (SPACE statement)* SPACE?)? "}"
+block      ::= "{" SPACE? (statements SPACE?)? "}"
 
 expression ::= program | call | assignment | e_list | e_terminal
 program    ::= "program" SPACE? t_group SPACE? statement
