@@ -7,7 +7,28 @@ export type File = {
     statements : Statement[]
 }
 
-export type Statement = Expression | Block | Return | If
+export type Statement = ExpressionStatement | Block | Return | If
+
+export type ExpressionStatement = {
+    type       : `expression_statement`
+    expression : Expression
+}
+
+export type Block = {
+    type       : `block`
+    statements : Statement[]
+}
+
+export type Return = {
+    type       : `return`
+    expression : Expression
+}
+
+export type If = {
+    type      : `if`
+    condition : Expression
+    then      : Statement
+}
 
 export type Expression = Name | Integer | Call | Empty | Assignment | ExpressionList | Program
 
@@ -47,22 +68,6 @@ export type Target = Name | TargetList | Empty
 export type TargetList = {
     type    : `target_list`
     targets : Target[]
-}
-
-export type Block = {
-    type       : `block`
-    statements : Statement[]
-}
-
-export type Return = {
-    type       : `return`
-    expression : Expression
-}
-
-export type If = {
-    type      : `if`
-    condition : Expression
-    then      : Statement
 }
 
 export type Program = {
@@ -107,13 +112,20 @@ export class Analyzer {
 
 
         switch (token.type) {
-            case `expression` : return this.check_expression(token)
+            case `expression` : return this.check_expression_statement(token)
             case `return`     : return this.check_return(token)
             case `if`         : return this.check_if(token)
             case `block`      : return this.check_block(token)
         }
 
         throw new Error(`Unexpected token type: ${token.type}`)
+    }
+
+    private check_expression_statement = (token : IToken) : ExpressionStatement => {
+        return {
+            type       : `expression_statement`,
+            expression : this.check_expression(token),
+        }
     }
 
     private check_expression = (token : IToken) => {
