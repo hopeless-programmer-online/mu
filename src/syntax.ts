@@ -3,7 +3,7 @@ import { readFile } from 'fs-extra'
 import { Grammars, IToken } from 'ebnf'
 
 
-class File {
+export class File {
     public static readonly symbol = Symbol(`syntax.File.symbol`)
 
     public readonly statements : StatementUnion[] = []
@@ -23,7 +23,7 @@ class File {
     }
 }
 
-class ExpressionStatement {
+export class ExpressionStatement {
     public static readonly symbol = Symbol(`syntax.ExpressionStatement.symbol`)
 
     public readonly expression : ExpressionUnion
@@ -41,7 +41,7 @@ class ExpressionStatement {
     }
 }
 
-class BlockStatement {
+export class BlockStatement {
     public static readonly symbol = Symbol(`syntax.BlockStatement.symbol`)
 
     public readonly statements : StatementUnion[] = []
@@ -63,7 +63,7 @@ class BlockStatement {
     }
 }
 
-class ReturnStatement {
+export class ReturnStatement {
     public static readonly symbol = Symbol(`syntax.ReturnStatement.symbol`)
 
     public readonly expression : ExpressionUnion
@@ -85,7 +85,7 @@ class ReturnStatement {
     }
 }
 
-class IfStatement {
+export class IfStatement {
     public static readonly symbol = Symbol(`syntax.IfStatement.symbol`)
 
     public readonly condition : ExpressionUnion
@@ -105,9 +105,9 @@ class IfStatement {
     }
 }
 
-type StatementUnion = ExpressionStatement | BlockStatement | ReturnStatement | IfStatement
+export type StatementUnion = ExpressionStatement | BlockStatement | ReturnStatement | IfStatement
 
-class NoneExpression {
+export class NoneExpression {
     public static readonly symbol = Symbol(`syntax.NoneExpression.symbol`)
 
     public get symbol() : typeof NoneExpression.symbol {
@@ -119,7 +119,7 @@ class NoneExpression {
     }
 }
 
-class LiteralExpression {
+export class LiteralExpression {
     public static readonly symbol = Symbol(`syntax.LiteralExpression.symbol`)
 
     public readonly literal : LiteralUnion
@@ -137,7 +137,7 @@ class LiteralExpression {
     }
 }
 
-class NameExpression {
+export class NameExpression {
     public static readonly symbol = Symbol(`syntax.NameExpression.symbol`)
 
     public readonly name : Name
@@ -155,7 +155,7 @@ class NameExpression {
     }
 }
 
-class AssignmentExpression {
+export class AssignmentExpression {
     public static readonly symbol = Symbol(`syntax.AssignmentExpression.symbol`)
 
     public readonly output : DestructuringUnion
@@ -175,7 +175,7 @@ class AssignmentExpression {
     }
 }
 
-class ListExpression {
+export class ListExpression {
     public static readonly symbol = Symbol(`syntax.ListExpression.symbol`)
 
     public readonly expressions : ExpressionUnion[]
@@ -193,7 +193,7 @@ class ListExpression {
     }
 }
 
-class ProgramExpression {
+export class ProgramExpression {
     public static readonly symbol = Symbol(`syntax.ProgramExpression.symbol`)
 
     public readonly program : Program
@@ -211,7 +211,7 @@ class ProgramExpression {
     }
 }
 
-class CallExpression {
+export class CallExpression {
     public static readonly symbol = Symbol(`syntax.CallExpression.symbol`)
 
     public readonly target : ExpressionUnion
@@ -231,9 +231,9 @@ class CallExpression {
     }
 }
 
-type ExpressionUnion = NoneExpression | LiteralExpression | NameExpression | AssignmentExpression | ListExpression | ProgramExpression | CallExpression
+export type ExpressionUnion = NoneExpression | LiteralExpression | NameExpression | AssignmentExpression | ListExpression | ProgramExpression | CallExpression
 
-class IntegerLiteral {
+export class IntegerLiteral {
     public static readonly symbol = Symbol(`syntax.IntegerLiteral.symbol`)
 
     public readonly text : string
@@ -251,9 +251,9 @@ class IntegerLiteral {
     }
 }
 
-type LiteralUnion = IntegerLiteral
+export type LiteralUnion = IntegerLiteral
 
-class Name {
+export class Name {
     public static readonly symbol = Symbol(`syntax.Name.symbol`)
 
     public readonly text : string
@@ -271,7 +271,7 @@ class Name {
     }
 }
 
-class EmptyDestructuring {
+export class EmptyDestructuring {
     public static readonly symbol = Symbol(`syntax.EmptyDestructuring.symbol`)
 
     public get symbol() : typeof EmptyDestructuring.symbol {
@@ -283,7 +283,7 @@ class EmptyDestructuring {
     }
 }
 
-class NameDestructuring {
+export class NameDestructuring {
     public static readonly symbol = Symbol(`syntax.NameDestructuring.symbol`)
 
     public readonly name : Name
@@ -301,7 +301,7 @@ class NameDestructuring {
     }
 }
 
-class ListDestructuring {
+export class ListDestructuring {
     public static readonly symbol = Symbol(`syntax.ListDestructuring.symbol`)
 
     public readonly expressions : DestructuringUnion[]
@@ -319,9 +319,9 @@ class ListDestructuring {
     }
 }
 
-type DestructuringUnion = EmptyDestructuring | NameDestructuring | ListDestructuring
+export type DestructuringUnion = EmptyDestructuring | NameDestructuring | ListDestructuring
 
-class Program {
+export class Program {
     public static readonly symbol = Symbol(`syntax.Program.symbol`)
 
     public readonly input : DestructuringUnion
