@@ -246,6 +246,13 @@ export class IntegerLiteral {
         return IntegerLiteral.symbol
     }
 
+    public is_equal(other : LiteralUnion) {
+        return (
+            other.symbol === IntegerLiteral.symbol &&
+            other.text === this.text
+        )
+    }
+
     public toString() {
         return this.text
     }
