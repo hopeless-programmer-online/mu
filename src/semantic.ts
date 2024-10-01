@@ -2,6 +2,7 @@ import * as syntax from './syntax'
 
 export type StatementUnion = BlockStatement | ReturnStatement | IfStatement | CallStatement | AssignmentStatement
 export type ScopeUnion = File | Program
+export type ExecutableUnion = File | Program | BlockStatement
 export type VariableUnion = NamedVariable | LiteralVariable | ClosureVariable | UnnamedVariable | UndeclaredVariable | ExternalVariable
 
 export class File {
@@ -44,7 +45,11 @@ export class BlockStatement {
 export class ReturnStatement {
     public static readonly symbol = Symbol(`syntax.ReturnStatement.symbol`)
 
-    public readonly variable = null
+    public readonly variable : VariableUnion
+
+    public constructor({ variable } : { variable : VariableUnion }) {
+        this.variable = variable
+    }
 
     public get symbol() : typeof ReturnStatement.symbol {
         return ReturnStatement.symbol
@@ -54,8 +59,13 @@ export class ReturnStatement {
 export class IfStatement {
     public static readonly symbol = Symbol(`syntax.IfStatement.symbol`)
 
-    public readonly condition = null
-    // public readonly then      : StatementUnion = null
+    public readonly condition : VariableUnion
+    public readonly then      : BlockStatement
+
+    public constructor({ condition, then } : { condition : VariableUnion, then : BlockStatement }) {
+        this.condition = condition
+        this.then      = then
+    }
 
     public get symbol() : typeof IfStatement.symbol {
         return IfStatement.symbol
@@ -209,7 +219,7 @@ export class Analyzer {
     public analyze(root : syntax.File) {
         const file = new File
 
-        process_statements(root.statements, file)
+        process_statements(root.statements, file, file)
 
         return file
     }
@@ -219,45 +229,52 @@ function assert_never(never : never, error : Error) : never {
     throw error
 }
 
-function process_statements(statements : syntax.StatementUnion[], scope : ScopeUnion) {
-    for (const statement of statements) process_statement(statement, scope)
+function process_statements(statements : syntax.StatementUnion[], scope : ScopeUnion, executable : ExecutableUnion) {
+    for (const statement of statements) process_statement(statement, scope, executable)
 
-        for (const x of scope.variables) {
-            if (x.symbol !== UndeclaredVariable.symbol || x.is_declared) continue
-            if (scope.symbol === Program.symbol) {
-                const undeclared = new UndeclaredVariable({ name : x.name })
+    for (const x of scope.variables) {
+        if (x.symbol !== UndeclaredVariable.symbol || x.is_declared) continue
+        if (scope.symbol === Program.symbol) {
+            const undeclared = new UndeclaredVariable({ name : x.name })
 
-                scope.parent.variables.push(undeclared)
+            scope.parent.variables.push(undeclared)
 
-                const closure = new ClosureVariable({ source : undeclared })
+            const closure = new ClosureVariable({ source : undeclared })
 
-                x.value = closure
-            }
-            else {
-                const external = new ExternalVariable({ name : x.name })
-
-                x.value = external
-            }
+            x.value = closure
         }
+        else {
+            const external = new ExternalVariable({ name : x.name })
+
+            x.value = external
+        }
+    }
 }
 
-function process_statement(statement : syntax.StatementUnion, scope : ScopeUnion) {
+function process_statement(statement : syntax.StatementUnion, scope : ScopeUnion, executable : ExecutableUnion) {
     if (statement.symbol === syntax.ExpressionStatement.symbol) {
-        process_expression(statement.expression, scope)
+        process_expression(statement.expression, scope, executable)
     }
     else if (statement.symbol === syntax.BlockStatement.symbol) {
         throw new Error // @todo
     }
     else if (statement.symbol === syntax.IfStatement.symbol) {
-        throw new Error // @todo
+        const condition = process_expression(statement.condition, scope, executable)
+        const then = new BlockStatement
+
+        process_statement(statement.then, scope, then)
+
+        executable.statements.push(new IfStatement({ condition, then }))
     }
     else if (statement.symbol === syntax.ReturnStatement.symbol) {
-        throw new Error // @todo
+        const variable = process_expression(statement.expression, scope, executable)
+
+        executable.statements.push(new ReturnStatement({ variable }))
     }
     else assert_never(statement, new Error) // @todo
 }
 
-function process_expression(expression : syntax.ExpressionUnion, scope : ScopeUnion) : VariableUnion {
+function process_expression(expression : syntax.ExpressionUnion, scope : ScopeUnion, executable : ExecutableUnion) : VariableUnion {
     if (expression.symbol === syntax.NoneExpression.symbol) {
         return find_named(new syntax.Name({ text : `none` }), scope)
     }
@@ -270,9 +287,9 @@ function process_expression(expression : syntax.ExpressionUnion, scope : ScopeUn
         return variable
     }
     else if (expression.symbol === syntax.AssignmentExpression.symbol) {
-        const variable = process_expression(expression.input, scope)
+        const variable = process_expression(expression.input, scope, executable)
 
-        process_destructuring(expression.output, variable, scope)
+        process_destructuring(expression.output, variable, scope, executable)
 
         return variable
     }
@@ -280,12 +297,12 @@ function process_expression(expression : syntax.ExpressionUnion, scope : ScopeUn
         throw new Error // @todo
     }
     else if (expression.symbol === syntax.CallExpression.symbol) {
-        const target = process_expression(expression.target, scope)
-        const input = process_expression(expression.input, scope)
+        const target = process_expression(expression.target, scope, executable)
+        const input = process_expression(expression.input, scope, executable)
         const output = new UnnamedVariable({ expression })
 
         scope.variables.push(output)
-        scope.statements.push(new CallStatement({ input, target, output }))
+        executable.statements.push(new CallStatement({ input, target, output }))
 
         return output
     }
@@ -351,7 +368,7 @@ function find_named(name : syntax.Name, scope : ScopeUnion) : VariableUnion {
     return undeclared
 }
 
-function process_destructuring(destructuring : syntax.DestructuringUnion, variable : VariableUnion, scope : ScopeUnion) {
+function process_destructuring(destructuring : syntax.DestructuringUnion, variable : VariableUnion, scope : ScopeUnion, executable : ExecutableUnion) {
     if (destructuring.symbol === syntax.EmptyDestructuring.symbol) {
         // do nothing
     }
@@ -376,11 +393,9 @@ function process_destructuring(destructuring : syntax.DestructuringUnion, variab
             output = named
 
             scope.variables.push(output)
-
-            // @todo: update undeclared
         }
 
-        scope.statements.push(new AssignmentStatement({ input : variable, output }))
+        executable.statements.push(new AssignmentStatement({ input : variable, output }))
     }
     else if (destructuring.symbol === syntax.ListDestructuring.symbol) {
         throw new Error // @todo

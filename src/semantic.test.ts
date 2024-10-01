@@ -32,3 +32,11 @@ it(`Call`, async () => {
 it(`List assignment`, async () => {
     expect((await parse(`x, y = 5`)).frame.variables.length).toBe(3)
 })*/
+
+it(`Return`, async () => {
+    expect((await parse(`return 5`)).variables.length).toBe(1)
+})
+
+it(`If`, async () => {
+    expect((await parse(`if 1 then return 5`)).variables.length).toBe(2)
+})
