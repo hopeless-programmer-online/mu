@@ -40,3 +40,11 @@ it(`Return`, async () => {
 it(`If`, async () => {
     expect((await parse(`if 1 then return 5`)).variables.length).toBe(2)
 })
+
+it(`Block`, async () => {
+    expect((await parse(`{}`)).variables.length).toBe(0)
+})
+
+it(`Program`, async () => {
+    expect((await parse(`program(){}`)).variables.length).toBe(1)
+})

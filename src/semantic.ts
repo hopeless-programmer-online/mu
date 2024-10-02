@@ -1,6 +1,6 @@
 import * as syntax from './syntax'
 
-export type StatementUnion = BlockStatement | ReturnStatement | IfStatement | CallStatement | AssignmentStatement
+export type StatementUnion = BlockStatement | ReturnStatement | IfStatement | CallStatement | AssignmentStatement | ProgramStatement
 export type ScopeUnion = File | Program
 export type ExecutableUnion = File | Program | BlockStatement
 export type VariableUnion = NamedVariable | LiteralVariable | ClosureVariable | UnnamedVariable | UndeclaredVariable | ExternalVariable
@@ -111,6 +111,22 @@ export class AssignmentStatement {
 
     public get symbol() : typeof AssignmentStatement.symbol {
         return AssignmentStatement.symbol
+    }
+}
+
+export class ProgramStatement {
+    public static readonly symbol = Symbol(`syntax.ProgramStatement.symbol`)
+
+    public readonly program  : Program
+    public readonly variable : VariableUnion
+
+    public constructor({ program, variable } : { program : Program, variable : VariableUnion }) {
+        this.program  = program
+        this.variable = variable
+    }
+
+    public get symbol() : typeof ProgramStatement.symbol {
+        return ProgramStatement.symbol
     }
 }
 
@@ -256,7 +272,11 @@ function process_statement(statement : syntax.StatementUnion, scope : ScopeUnion
         process_expression(statement.expression, scope, executable)
     }
     else if (statement.symbol === syntax.BlockStatement.symbol) {
-        throw new Error // @todo
+        const block = new BlockStatement
+
+        process_statements(statement.statements, scope, block)
+
+        executable.statements.push(block)
     }
     else if (statement.symbol === syntax.IfStatement.symbol) {
         const condition = process_expression(statement.condition, scope, executable)
@@ -307,7 +327,32 @@ function process_expression(expression : syntax.ExpressionUnion, scope : ScopeUn
         return output
     }
     else if (expression.symbol === syntax.ProgramExpression.symbol) {
-        throw new Error // @todo
+        const program = new Program({ parent : scope })
+
+        function process_destructuring(destructuring : syntax.DestructuringUnion) {
+            if (destructuring.symbol === syntax.EmptyDestructuring.symbol) {
+                // do nothing
+            }
+            else if (destructuring.symbol === syntax.NameDestructuring.symbol) {
+                const named = new NamedVariable({ name : destructuring.name })
+
+                scope.variables.push(named)
+            }
+            else if (destructuring.symbol === syntax.ListDestructuring.symbol) {
+                throw new Error // @todo
+            }
+            else assert_never(destructuring, new Error) // @todo
+        }
+
+        process_destructuring(expression.program.input)
+        process_statement(expression.program.body, program, program)
+
+        const variable = new UnnamedVariable({ expression })
+
+        scope.variables.push(variable)
+        executable.statements.push(new ProgramStatement({ program, variable }))
+
+        return variable
     }
     else assert_never(expression, new Error) // @todo
 }
