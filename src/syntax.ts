@@ -378,7 +378,7 @@ export class Analyzer {
     }
 
     private check_statement(token : IToken) : StatementUnion {
-        if (token.type !== `statement`) throw new Error
+        if (token.type !== `statement`) throw new Error(`Statement expected, received ${token.type}`)
         if (token.children.length !== 1) throw new Error
 
         token = token.children[0]
@@ -538,7 +538,9 @@ export class Analyzer {
     private check_block(token : IToken) : BlockStatement {
         if (token.type !== `block`) throw new Error
 
-        const statements = token.children.map(child => this.check_statement(child))
+        const statements = token.children.length > 0
+            ? this.check_statements(token.children[0])
+            : []
 
         return new BlockStatement({ statements })
     }

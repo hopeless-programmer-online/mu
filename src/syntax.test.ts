@@ -54,6 +54,13 @@ it(`Single assignment`, async () => {
     )
 })
 
+it(`Program assignment`, async () => {
+    expect(await parse(`x = program(){}`)).toBe(
+        `x = program() {\n` +
+        `}\n`
+    )
+})
+
 it(`Group assignment`, async () => {
     expect(await parse(`(x) = x`)).toBe(
         `x = x\n`

@@ -1,6 +1,6 @@
 import * as syntax from './syntax'
 
-export type StatementUnion = BlockStatement | ReturnStatement | IfStatement | CallStatement | AssignmentStatement | ProgramStatement
+export type StatementUnion = BlockStatement | ReturnStatement | IfStatement | CallStatement | AssignmentStatement | ProgramStatement | ListStatement
 export type ScopeUnion = File | Program
 export type ExecutableUnion = File | Program | BlockStatement
 export type VariableUnion = NamedVariable | LiteralVariable | ClosureVariable | UnnamedVariable | UndeclaredVariable | ExternalVariable
@@ -130,6 +130,22 @@ export class ProgramStatement {
     }
 }
 
+export class ListStatement {
+    public static readonly symbol = Symbol(`syntax.ListStatement.symbol`)
+
+    public readonly list     : VariableUnion
+    public readonly elements : VariableUnion[]
+
+    public constructor({ list, elements } : { list : VariableUnion, elements : VariableUnion[] }) {
+        this.list     = list
+        this.elements = elements
+    }
+
+    public get symbol() : typeof ListStatement.symbol {
+        return ListStatement.symbol
+    }
+}
+
 export class NamedVariable {
     public static readonly symbol = Symbol(`syntax.NamedVariable.symbol`)
 
@@ -174,12 +190,6 @@ export class ClosureVariable {
 
 export class UnnamedVariable {
     public static readonly symbol = Symbol(`syntax.UnnamedVariable.symbol`)
-
-    public readonly expression : syntax.ExpressionUnion
-
-    public constructor({ expression } : { expression : syntax.ExpressionUnion }) {
-        this.expression = expression
-    }
 
     public get symbol() : typeof UnnamedVariable.symbol {
         return UnnamedVariable.symbol
@@ -314,12 +324,19 @@ function process_expression(expression : syntax.ExpressionUnion, scope : ScopeUn
         return variable
     }
     else if (expression.symbol === syntax.ListExpression.symbol) {
-        throw new Error // @todo
+        const list = new UnnamedVariable
+        const elements = expression.expressions.map(x => process_expression(x, scope, executable))
+
+        executable.statements.push(new ListStatement({ list, elements }))
+
+        scope.variables.push(list)
+
+        return list
     }
     else if (expression.symbol === syntax.CallExpression.symbol) {
         const target = process_expression(expression.target, scope, executable)
         const input = process_expression(expression.input, scope, executable)
-        const output = new UnnamedVariable({ expression })
+        const output = new UnnamedVariable
 
         scope.variables.push(output)
         executable.statements.push(new CallStatement({ input, target, output }))
@@ -347,7 +364,7 @@ function process_expression(expression : syntax.ExpressionUnion, scope : ScopeUn
         process_destructuring(expression.program.input)
         process_statement(expression.program.body, program, program)
 
-        const variable = new UnnamedVariable({ expression })
+        const variable = new UnnamedVariable
 
         scope.variables.push(variable)
         executable.statements.push(new ProgramStatement({ program, variable }))
@@ -434,10 +451,11 @@ function process_destructuring(destructuring : syntax.DestructuringUnion, variab
             const named = new NamedVariable({ name : destructuring.name })
 
             if (output?.symbol === UndeclaredVariable.symbol) output.value = named
+            else {
+                output = named
 
-            output = named
-
-            scope.variables.push(output)
+                scope.variables.push(output)
+            }
         }
 
         executable.statements.push(new AssignmentStatement({ input : variable, output }))
