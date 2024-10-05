@@ -1,6 +1,7 @@
 import { join as join_path } from 'path'
 import { readFile } from 'fs-extra'
 import { Grammars, IToken } from 'ebnf'
+import { tab } from './utilities'
 
 
 export class File {
@@ -588,8 +589,4 @@ export class Analyzer {
 
         return this.analyze_text(text)
     }
-}
-
-function tab(text : string, indent = `    `) {
-    return text.replace(/^/, indent).replace(/\n/, indent)
 }

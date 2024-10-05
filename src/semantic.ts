@@ -1,4 +1,5 @@
 import * as syntax from './syntax'
+import { assert_never } from './utilities'
 
 export type StatementUnion = BlockStatement | ReturnStatement | IfStatement | CallStatement | AssignmentStatement | ProgramStatement | ListStatement
 export type ScopeUnion = File | Program
@@ -13,6 +14,23 @@ export class File {
 
     public get symbol() : typeof File.symbol {
         return File.symbol
+    }
+    public get programs() {
+        const programs : Program[] = []
+        const iterate = (statement : StatementUnion) => {
+            if (statement.symbol === ProgramStatement.symbol) {
+                programs.push(statement.program)
+
+                statement.program.statements.forEach(iterate)
+            }
+            else if (statement.symbol === BlockStatement.symbol) {
+                statement.statements.forEach(iterate)
+            }
+        }
+
+        this.statements.forEach(iterate)
+
+        return programs
     }
 }
 
@@ -249,10 +267,6 @@ export class Analyzer {
 
         return file
     }
-}
-
-function assert_never(never : never, error : Error) : never {
-    throw error
 }
 
 function process_statements(statements : syntax.StatementUnion[], scope : ScopeUnion, executable : ExecutableUnion) {
