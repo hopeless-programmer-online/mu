@@ -5,15 +5,16 @@
     (memory $memory 1)
     ;; { memory mapping
         ;; text
-        (data (i32.const 0)   "\n")           (; 0 + 1 = 1 ;)      (func $write.newline       (call $print.ascii (i32.const 0) (i32.const 1)))
-        (data (i32.const 1)   "ERROR")        (; 1 + 5 = 6 ;)      (func $write.ERROR         (call $print.ascii (i32.const 1) (i32.const 5)))
-        (data (i32.const 6)   "unknown")      (; 6 + 7 = 13 ;)     (func $write.unknown       (call $print.ascii (i32.const 6) (i32.const 7)))
-        (data (i32.const 13)  "nothing")      (; 13 + 7 = 20 ;)    (func $write.nothing       (call $print.ascii (i32.const 13) (i32.const 7)))
+        (data (i32.const 0)  "\n")      (; 0 + 1 = 1 ;)      (func $write.newline (call $print.ascii (i32.const 0) (i32.const 1)))
+        (data (i32.const 1)  "ERROR")   (; 1 + 5 = 6 ;)      (func $write.ERROR   (call $print.ascii (i32.const 1) (i32.const 5)))
+        (data (i32.const 6)  "unknown") (; 6 + 7 = 13 ;)     (func $write.unknown (call $print.ascii (i32.const 6) (i32.const 7)))
+        (data (i32.const 13) "nothing") (; 13 + 7 = 20 ;)    (func $write.nothing (call $print.ascii (i32.const 13) (i32.const 7)))
+        (data (i32.const 20) "print")   (; 20 + 5 = 25 ;)    (func $write.print   (call $print.ascii (i32.const 20) (i32.const 5)))
         ;; globals
         (func $global.nothing.address (result i32) i32.const 768 return) (func $global.nothing (result i32) call $global.nothing.address i32.load return)
         (func $global.print.address   (result i32) i32.const 772 return) (func $global.print   (result i32) call $global.print.address i32.load return)
         ;; heap
-        (func $heap.begin (result i32) i32.const 0)
+        (func $heap.begin (result i32) i32.const 1024)
         (func $heap.end   (result i32) i32.const 65524) ;; 1×65K - 12
     ;; }
 
@@ -338,9 +339,66 @@
     ;; }
 
     ;; { types
-        (func $type.Nothing        (result i32) i32.const 0 return)
-        (func $type.Print          (result i32) i32.const 1 return)
-        (func $type.Int32.instance (result i32) i32.const 2 return)
+        (func $type.Nothing          (result i32) i32.const 0 return)
+        (func $type.Print            (result i32) i32.const 1 return)
+        (func $type.Int32.instance   (result i32) i32.const 2 return)
+        (func $type.Program.instance (result i32) i32.const 3 return)
+    ;; }
+
+    (table 100 funcref)
+    ;; { tables
+        ;; { call
+            (func $virtual.call.offset (result i32) i32.const 0)
+            (elem (i32.const 0)
+                $virtual.call.error ;; Nothing
+                $Print.call         ;; Print
+                $virtual.call.error ;; Int32.instance
+                $virtual.call.error ;; Program.instance
+            )
+            (type $virtual.call (func (param $something i32) (param $input i32) (result i32)))
+            (func $virtual.call (param $something i32) (param $input i32) (result i32)
+                local.get $something
+                local.get $input
+
+                local.get $something
+                call $something.type
+                call $virtual.call.offset
+                i32.add
+                call_indirect (type $virtual.call)
+                return
+            )
+            (func $virtual.call.error (param $something i32) (param $input i32) (result i32)
+                call $write.ERROR
+                call $write.newline
+
+                call $global.nothing
+                return
+            )
+        ;; }
+
+        ;; { print
+            (func $virtual.print.offset (result i32) i32.const 50)
+            (elem (i32.const 50)
+                $Nothing.print         ;; Nothing
+                $Print.print           ;; Print
+                $virtual.print.unknown ;; Int32.instance
+                $virtual.print.unknown ;; Program.instance
+            )
+            (type $virtual.print (func (param $something i32)))
+            (func $virtual.print (param $something i32)
+                local.get $something
+
+                local.get $something
+                call $something.type
+                call $virtual.print.offset
+                i32.add
+                call_indirect (type $virtual.print)
+            )
+            (func $virtual.print.unknown (param $something i32)
+                call $write.unknown
+                return
+            )
+        ;; }
     ;; }
 
     ;; { Something
@@ -375,6 +433,89 @@
             local.get $nothing
             return
         )
+        (func $Nothing.print (param $nothing i32)
+            call $write.nothing
+            return
+        )
+    ;; }
+
+    ;; { Program
+        (func $sizeof.Program.instance.header (result i32)
+            i32.const 12
+            return
+        )
+        (func $sizeof.Program.instance (param $closure_length i32) (result i32)
+            call $sizeof.Program.instance.header
+            local.get $closure_length
+            i32.const 4
+            i32.mul
+            i32.add
+            return ;; header + closure_length * 4
+        )
+        (func $Program.instance.closure.length.offset (result i32)
+            i32.const 4
+            return
+        )
+        (func $Program.instance.closure.length (param $program i32) (result i32)
+            local.get $program
+            call $Program.instance.closure.length.offset
+            i32.add
+            i32.load
+            return
+        )
+        (func $Program.instance.closure.length.set (param $program i32) (param $length i32)
+            local.get $program
+            call $Program.instance.closure.length.offset
+            i32.add
+            local.get $length
+            i32.store
+        )
+        (func $Program.instance.closure.first.offset (result i32)
+            call $sizeof.Program.instance.header
+            return
+        )
+        (func $Program.instance.closure.first (param $program i32) (result i32)
+            local.get $program
+            call $Program.instance.closure.first.offset
+            i32.add
+            return
+        )
+        (func $Program.instance.closure.get_at (param $program i32) (param $i i32) (result i32)
+            local.get $program
+            call $Program.instance.closure.first
+            local.get $i
+            i32.const 4
+            i32.mul
+            i32.add
+            i32.load
+            return ;; [first + i*4]
+        )
+        (func $Program.instance.closure.set_at (param $program i32) (param $i i32) (param $value i32)
+            local.get $program
+            call $Program.instance.closure.first
+            local.get $i
+            i32.const 4
+            i32.mul
+            i32.add
+            local.get $value
+            i32.store
+            ;; [first + i*4] = value
+        )
+        (func $Program.instance.constructor (param $closure_length) (result i32)
+            (local $program i32)
+            ;; allocate
+            local.get $closure_length
+            call $sizeof.Program.instance
+            call $mem.allocate
+            local.set $program
+            ;; program.type = type.Program
+            local.get $program
+            call $type.Program.instance
+            call $something.type.set
+            ;; return
+            local.get $program
+            return
+        )
     ;; }
 
     ;; { Print
@@ -394,6 +535,19 @@
             call $something.type.set
             ;; return
             local.get $print
+            return
+        )
+        (func $Print.call (param $print i32) (param $input i32) (result i32)
+            local.get $input
+            call $virtual.print
+            call $write.newline
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $Print.print (param $print i32)
+            call $write.print
             return
         )
     ;; }
@@ -442,10 +596,18 @@
     ;; }
 
     (func $call (param $target i32) (param $input i32) (result i32)
-        local.get $target
-        call $something.type
-        call $print.int32
-        call $write.newline
+            local.get $target
+            local.get $input
+            call $virtual.call
+;;         local.get $target
+;;         call $something.type
+;;         call $print.int32
+;;         call $write.newline
+;;
+;;         local.get $input
+;;         call $something.type
+;;         call $print.int32
+;;         call $write.newline
 
         ;; @todo
 

@@ -48,6 +48,16 @@ export class Program {
     public get symbol() : typeof Program.symbol {
         return Program.symbol
     }
+    public get closure() {
+        const filter = (variable : VariableUnion) : variable is (ClosureVariable | UndeclaredVariable) => {
+            if (variable.symbol === ClosureVariable.symbol) return true
+            if (variable.symbol === UndeclaredVariable.symbol) return filter(variable.value)
+
+            return false
+        }
+
+        return this.variables.filter(filter)
+    }
 }
 
 export class BlockStatement {
