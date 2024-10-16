@@ -10,16 +10,8 @@ class VariablesMapper {
 
         if (name != null) return name
 
-        const match = (target : semantic.VariableUnion, other : semantic.VariableUnion) : boolean => {
-            if (other === target) return true
-            if (target.symbol === semantic.UndeclaredVariable.symbol && match(target.value, other)) return true
-            if (other.symbol === semantic.UndeclaredVariable.symbol) return match(target, other.value)
-
-            return false
-        }
-
         for (const [ other, name ] of this.lookup) {
-            if (!match(variable, other)) continue
+            if (!variable.is_equal(other)) continue
 
             this.lookup.set(variable, name)
 
@@ -50,12 +42,22 @@ class ProgramsMapper {
     }
 }
 
+export class Translation {
+    public readonly main  : string
+    public readonly table : string
+
+    public constructor({ main, table } : { main : string, table : string }) {
+        this.main  = main
+        this.table = table
+    }
+}
+
 export class Translator {
     public translate(file : semantic.File) {
         const variables_naming = new VariablesMapper
         const programs_naming = new ProgramsMapper
 
-        const stringify_variables = (variables : semantic.VariableUnion[]) => {
+        const stringify_variables = (variables : readonly semantic.VariableUnion[]) => {
             return (
                 variables
                 .map(x => `(local ${variables_naming.get(x)} i32)`)
@@ -63,42 +65,32 @@ export class Translator {
             )
         }
 
-        const initialize_variables = (variables : semantic.VariableUnion[], scope : semantic.ScopeUnion) => {
-            const initialize_variable = (variable : semantic.VariableUnion) : string => {
+        const initialize_variables = (variables : readonly semantic.FrameVariableUnion[], exe : semantic.ExecutableUnion) => {
+            const initialize_variable = (variable : semantic.FrameVariableUnion) : string => {
                 const name = variables_naming.get(variable)
 
-                if (variable.symbol === semantic.NamedVariable.symbol) {
+                if (variable.symbol === semantic.LocalVariable.symbol) {
                     return (
                         `call $global.nothing\n` +
+                        `call $Variable.constructor\n` +
                         `local.set ${name}`
                     )
                 }
                 else if (variable.symbol === semantic.ClosureVariable.symbol) {
-                    if (scope.symbol !== semantic.Program.symbol) throw new Error // @todo
+                    if (exe.symbol !== semantic.Program.symbol) throw new Error // @todo
 
-                    const find = (other : semantic.VariableUnion) : boolean => {
-                        if (other === variable) return true
-                        if (other.symbol === semantic.UndeclaredVariable.symbol) return find(other.value)
+                    const index = exe.closure.indexOf(variable)
 
-                        return false
-                    }
-
-                    const index = scope.closure.findIndex(find)
-
-                    if (index < 0) {
-                        console.log(variable)
-                        console.log(scope.closure)
-                        console.log(scope.variables)
-
-                        throw new Error // @todo
-                    }
+                    if (index < 0) throw new Error // @todo
 
                     return (
                         `local.get $program\n` +
                         `i32.const ${index}\n` +
                         `call $Program.instance.closure.get_at\n` +
+                        // `call $Variable.constructor\n` +
                         `local.set ${name}`
                     )
+                    // throw new Error // @todo
                 }
                 else if (variable.symbol === semantic.LiteralVariable.symbol) {
                     const { literal } = variable
@@ -107,6 +99,7 @@ export class Translator {
                         return (
                             `i32.const ${literal.text}\n` +
                             `call $Int32.instance.constructor\n` +
+                            `call $Variable.constructor\n` +
                             `local.set ${name}`
                         )
                     }
@@ -115,27 +108,35 @@ export class Translator {
                 else if (variable.symbol === semantic.UnnamedVariable.symbol) {
                     return (
                         `call $global.nothing\n` +
+                        `call $Variable.constructor\n` +
                         `local.set ${name}`
                     )
                 }
                 else if (variable.symbol === semantic.ExternalVariable.symbol) {
-                    const { text } = variable.name
+                    const text = variable.name
 
                     switch (text) {
                         case `nothing`: return (
                             `call $global.nothing\n` +
+                            `call $Variable.constructor\n` +
                             `local.set ${name}`
                         )
                         case `print`: return (
                             `call $global.print\n` +
+                            `call $Variable.constructor\n` +
                             `local.set ${name}`
                         )
                     }
 
                     throw new Error // @todo
                 }
-                else if (variable.symbol === semantic.UndeclaredVariable.symbol) {
-                    return initialize_variable(variable.value)
+                else if (variable.symbol === semantic.ParameterVariable.symbol) {
+                    // return (
+                    //     `call $global.nothing\n` +
+                    //     `call $Variable.constructor\n` +
+                    //     `local.set ${name}`
+                    // )
+                    throw new Error // @todo
                 }
                 else assert_never(variable, new Error) // @todo
             }
@@ -145,7 +146,7 @@ export class Translator {
                 .join(`\n\n`)
         }
 
-        const stringify_statements = (statements : semantic.StatementUnion[]) => {
+        const stringify_statements = (statements : readonly semantic.StatementUnion[]) => {
             const stringify_statement = (statement : semantic.StatementUnion) : string => {
                 if (statement.symbol === semantic.CallStatement.symbol) {
                     const target = variables_naming.get(statement.target)
@@ -153,20 +154,23 @@ export class Translator {
                     const output = variables_naming.get(statement.output)
 
                     return (
-                        `local.get ${target}\n` +
-                        `local.get ${input}\n` +
-                        `call $call\n` +
-                        `local.set ${output}`
+                        `local.get ${output}\n` +
+                        `    local.get ${target}\n` +
+                        `    call $Variable.target\n` +
+                        `    local.get ${input}\n` +
+                        `    call $Variable.target\n` +
+                        `    call $call\n` +
+                        `call $Variable.target.set`
                     )
                 }
                 else if (statement.symbol === semantic.IfStatement.symbol) {
                     throw new Error // @todo
                 }
-                else if (statement.symbol === semantic.ListStatement.symbol) {
+                else if (statement.symbol === semantic.PackStatement.symbol) {
                     throw new Error // @todo
                 }
                 else if (statement.symbol === semantic.BlockStatement.symbol) {
-                    return stringify_statements(statement.statements)
+                    return stringify_statements(statement.statements.array)
                     // throw new Error // @todo
                 }
                 else if (statement.symbol === semantic.ReturnStatement.symbol) {
@@ -174,24 +178,34 @@ export class Translator {
 
                     return (
                         `local.get ${result}\n` +
+                        `call $Variable.target\n` +
                         `return`
                     )
                 }
                 else if (statement.symbol === semantic.ProgramStatement.symbol) {
-                    const { program } = statement
                     const variable = variables_naming.get(statement.variable)
+                    const { program, program : { closure } } = statement
+                    const index = file.programs.indexOf(program)
 
-                    // program.closure.map(x => {
-                    //     x
-                    // })
+                    if (index < 0) throw new Error // @todo
 
                     return (
-                        `i32.const ${program.closure.length}\n` +
-                        `call $Program.instance.constructor\n` +
-                        `local.set ${variable}`
+                        `local.get ${variable}\n` +
+                        `    i32.const ${closure.length}\n` +
+                        `    i32.const ${index}\n` +
+                        `    call $Program.instance.constructor\n` +
+                        `call $Variable.target.set\n` +
+                        closure
+                        .map(({ source }, i) => (
+                            `local.get ${variable}\n` +
+                            `call $Variable.target\n` +
+                            `i32.const ${i}\n` +
+                            `local.get ${variables_naming.get(source)}\n` +
+                            `call $Program.instance.closure.set_at\n`
+                        ))
+                        .map(x => tab(x))
+                        .join(`\n`)
                     )
-
-                    // throw new Error // @todo
                 }
                 else if (statement.symbol === semantic.AssignmentStatement.symbol) {
                     const input  = variables_naming.get(statement.input)
@@ -201,6 +215,16 @@ export class Translator {
                         `local.get ${input}\n` +
                         `local.set ${output}`
                     )
+                }
+                else if (statement.symbol === semantic.UnpackStatement.symbol) {
+//                     const input  = variables_naming.get(statement.input)
+//                     const output = variables_naming.get(statement.output)
+//
+//                     return (
+//                         `local.get ${input}\n` +
+//                         `local.set ${output}`
+//                     )
+                    throw new Error // @todo
                 }
                 else assert_never(statement, new Error) // @todo
             }
@@ -214,11 +238,11 @@ export class Translator {
             const stringify_program = (program : semantic.Program) => {
                 return (
                     `(func ${programs_naming.get(program)} (param $program i32) (param $input i32) (result i32)\n` +
-                    tab(stringify_variables(program.variables)) + `\n` +
+                    tab(stringify_variables(program.variables.array)) + `\n` +
                     `    \n` +
-                    tab(initialize_variables(program.variables, program)) + `\n` +
+                    tab(initialize_variables(program.variables.array, program)) + `\n` +
                     `    \n` +
-                    tab(stringify_statements(program.statements)) + `\n` +
+                    tab(stringify_statements(program.statements.array)) + `\n` +
                         `    \n` +
                     `    ;; final return\n` +
                     `    call $global.nothing\n` +
@@ -232,17 +256,31 @@ export class Translator {
                 .join(`\n\n`)
         }
 
-        const file_text = (
+        const table = (
+            `(elem (i32.const 100)\n` +
+            tab(
+                file.programs
+                .map(x =>
+                    `${programs_naming.get(x)}`
+                )
+                .map(x => tab(x))
+                .join(`\n`),
+                `    `.repeat(3)
+            )+
+            `)`
+        )
+
+        const main = (
             stringify_programs(file.programs) +
             `\n` +
             `(func $main (result i32)\n` +
-            tab(stringify_variables(file.variables)) + `\n` +
+            tab(stringify_variables(file.variables.array)) + `\n` +
             `    \n` +
             `    call $init\n` +
             `    \n` +
-            tab(initialize_variables(file.variables, file)) + `\n` +
+            tab(initialize_variables(file.variables.array, file)) + `\n` +
             `    \n` +
-            tab(stringify_statements(file.statements)) + `\n` +
+            tab(stringify_statements(file.statements.array)) + `\n` +
             `    \n` +
             `    ;; final return\n` +
             `    call $global.nothing\n` +
@@ -250,6 +288,6 @@ export class Translator {
             `)`
         )
 
-        return file_text
+        return new Translation({ main, table })
     }
 }
