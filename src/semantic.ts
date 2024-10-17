@@ -642,6 +642,12 @@ class Name {
     public constructor({ text } : { text : string }) {
         this.text = text
     }
+
+    public toString() {
+        const { text, used, assigned, parameter } = this
+
+        return `${text} (used: ${used}, assigned: ${assigned}, parameter: ${parameter})`
+    }
 }
 
 class Names {
@@ -857,23 +863,23 @@ function process_destructuring(des : syntax.DestructuringUnion, input : Variable
 
 function process_program(exp : syntax.ProgramExpression, exe : ExecutableUnion) {
     const names = new Names
+    const prog = new Program({ parent : exe.frame })
+    const input = new InputVariable({ frame : prog })
 
     scan_destructuring(exp.program.input, names, `parameters`)
     scan_statement(exp.program.body, names)
 
-    // add externals
     names.for_each(name => {
-        if (name.assigned || name.parameter || !name.used) return
+        // console.log(`${name}`)
 
-        exe.file.variables.get_or_add_external(name.text)
-    })
+        if (!name.assigned && !name.parameter && name.used) {
+            exe.file.variables.get_or_add_external(name.text)
+        }
+        if (name.parameter) return
 
-    const prog = new Program({ parent : exe.frame })
-
-    names.for_each(name => {
         const source = exe.frame.variables.find_by_name(name.text)
 
-        if (!source) return
+        if (!source) return // @todo: add local?
 
         prog.variables.get_or_add_closure(source)
     })
@@ -895,8 +901,6 @@ function process_program(exp : syntax.ProgramExpression, exe : ExecutableUnion) 
         }
         else assert_never(param, new Error) // @todo
     }
-
-    const input = new InputVariable({ frame : prog })
 
     process_parameter(exp.program.input, input)
     process_statement(exp.program.body, prog)
