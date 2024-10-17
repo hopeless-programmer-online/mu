@@ -7,7 +7,7 @@
     ".": "./dist/mu.js"
   },
   "scripts": {
-    "build": "ts-node src/grammar.script.ts && tsc",
+    "build": "ts-node src/prebuild.script.ts && tsc",
     "prepare": "npm run build",
     "test": "jest"
   },

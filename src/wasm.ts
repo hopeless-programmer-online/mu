@@ -1,5 +1,6 @@
 import * as syntax from './syntax'
 import * as semantic from './semantic'
+import template from './engine'
 import { tab, assert_never } from './utilities'
 
 class VariablesMapper {
@@ -347,5 +348,26 @@ export class Translator {
         )
 
         return new Translation({ main, table })
+    }
+}
+
+export class Compiler {
+    public compile(text : string) {
+        const syntax_analyzer = new syntax.Analyzer
+        const root = syntax_analyzer.analyze_text(text)
+
+        // console.log(inspect(root, { depth : 10 }))
+
+        const semantic_analyzer = new semantic.Analyzer
+        const file =  semantic_analyzer.analyze(root)
+        const translator = new Translator
+        const { main, table } = translator.translate(file)
+
+        const wat = template
+            .replace(/    \(func \$main\)/, tab(main))
+            .replace(/\(table 100 funcref\)/, `(table ${100 + file.programs.length} funcref)`)
+            .replace(/\(elem \(i32.const 100\)\)/, table)
+
+        return wat
     }
 }
