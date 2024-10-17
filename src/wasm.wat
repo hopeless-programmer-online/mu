@@ -11,9 +11,15 @@
         (data (i32.const 13) "nothing") (; 13 + 7 = 20 ;)    (func $write.nothing (call $print.ascii (i32.const 13) (i32.const 7)))
         (data (i32.const 20) "print")   (; 20 + 5 = 25 ;)    (func $write.print   (call $print.ascii (i32.const 20) (i32.const 5)))
         (data (i32.const 25) "pack")    (; 25 + 4 = 29 ;)    (func $write.pack    (call $print.ascii (i32.const 25) (i32.const 4)))
+        (data (i32.const 29) "__le__")  (; 29 + 6 = 35 ;)    (func $write.__le__  (call $print.ascii (i32.const 29) (i32.const 6)))
+        (data (i32.const 35) "__mul__") (; 35 + 7 = 42 ;)    (func $write.__mul__ (call $print.ascii (i32.const 35) (i32.const 7)))
+        (data (i32.const 42) "__sub__") (; 42 + 7 = 49 ;)    (func $write.__sub__ (call $print.ascii (i32.const 42) (i32.const 7)))
         ;; globals
         (func $global.nothing.address (result i32) i32.const 768 return) (func $global.nothing (result i32) call $global.nothing.address i32.load return)
         (func $global.print.address   (result i32) i32.const 772 return) (func $global.print   (result i32) call $global.print.address i32.load return)
+        (func $global.__le__.address  (result i32) i32.const 776 return) (func $global.__le__  (result i32) call $global.__le__.address i32.load return)
+        (func $global.__mul__.address (result i32) i32.const 780 return) (func $global.__mul__ (result i32) call $global.__mul__.address i32.load return)
+        (func $global.__sub__.address (result i32) i32.const 784 return) (func $global.__sub__ (result i32) call $global.__sub__.address i32.load return)
         ;; heap
         (func $heap.begin (result i32) i32.const 1024)
         (func $heap.end   (result i32) i32.const 65524) ;; 1×65K - 12
@@ -345,6 +351,9 @@
         (func $type.Int32.instance   (result i32) i32.const 2 return)
         (func $type.Program.instance (result i32) i32.const 3 return)
         (func $type.Pack.instance    (result i32) i32.const 4 return)
+        (func $type.__le__           (result i32) i32.const 5 return)
+        (func $type.__mul__          (result i32) i32.const 6 return)
+        (func $type.__sub__          (result i32) i32.const 7 return)
     ;; }
 
     (table 100 funcref)
@@ -357,6 +366,9 @@
                 $virtual.call.error    ;; Int32.instance
                 $Program.instance.call ;; Program.instance
                 $virtual.call.error    ;; Pack.instance
+                $__le__.call           ;; __le__
+                $__mul__.call          ;; __mul__
+                $__sub__.call          ;; __sub__
             )
             (type $virtual.call (func (param $something i32) (param $input i32) (result i32)))
             (func $virtual.call (param $something i32) (param $input i32) (result i32)
@@ -387,6 +399,9 @@
                 $Int32.instance.print  ;; Int32.instance
                 $virtual.print.unknown ;; Program.instance
                 $Pack.instance.print   ;; Pack.instance
+                $__le__.print          ;; __le__
+                $__mul__.print         ;; __mul__
+                $__sub__.print         ;; __sub__
             )
             (type $virtual.print (func (param $something i32)))
             (func $virtual.print (param $something i32)
@@ -412,6 +427,9 @@
                 $virtual.unpack.unknown ;; Int32.instance
                 $virtual.unpack.unknown ;; Program.instance
                 $Pack.instance.unpack   ;; Pack.instance
+                $virtual.unpack.unknown ;; __le__
+                $virtual.unpack.unknown ;; __mul__
+                $virtual.unpack.unknown ;; __sub__
             )
             (type $virtual.unpack (func (param $something i32) (param $index i32) (result i32)))
             (func $virtual.unpack (param $something i32) (param $index i32) (result i32)
@@ -426,6 +444,34 @@
             )
             (func $virtual.unpack.unknown (param $something i32) (param $index i32) (result i32)
                 call $global.nothing
+                return
+            )
+        ;; }
+
+        ;; { if
+            (func $virtual.if.offset (result i32) i32.const 60)
+            (elem (i32.const 60)
+                $virtual.if.unknown ;; Nothing
+                $virtual.if.unknown ;; Print
+                $Int32.instance.if  ;; Int32.instance
+                $virtual.if.unknown ;; Program.instance
+                $virtual.if.unknown ;; Pack.instance
+                $virtual.if.unknown ;; __le__
+                $virtual.if.unknown ;; __mul__
+                $virtual.if.unknown ;; __sub__
+            )
+            (type $virtual.if (func (param $something i32) (result i32)))
+            (func $virtual.if (param $something i32) (result i32)
+                local.get $something
+
+                local.get $something
+                call $something.type
+                call $virtual.if.offset
+                i32.add
+                call_indirect (type $virtual.if)
+            )
+            (func $virtual.if.unknown (param $something i32) (result i32)
+                i32.const 0
                 return
             )
         ;; }
@@ -807,6 +853,199 @@
             call $Int32.instance.value
             call $print.int32
         )
+        (func $Int32.instance.if (param $int32 i32) (result i32)
+            local.get $int32
+            call $Int32.instance.value
+            i32.const 0
+            i32.ne
+            return ;; return int32.value != 0
+        )
+    ;; }
+
+    ;; { __le__
+        (func $sizeof.__le__ (result i32)
+            i32.const 4
+            return
+        )
+        (func $__le__.constructor (result i32)
+            (local $__le__ i32)
+            ;; allocate
+            call $sizeof.__le__
+            call $mem.allocate
+            local.set $__le__
+            ;; __le__.type = type.__le__
+            local.get $__le__
+            call $type.__le__
+            call $something.type.set
+            ;; return
+            local.get $__le__
+            return
+        )
+        (func $__le__.call (param $__le__ i32) (param $input i32) (result i32)
+            (local $left i32)
+            (local $right i32)
+
+            local.get $input
+            i32.const 0
+            call $virtual.unpack
+            local.set $left
+
+            local.get $input
+            i32.const 1
+            call $virtual.unpack
+            local.set $right
+
+            local.get $left
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            local.get $right
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            i32.and
+            (if (then
+                local.get $left
+                call $Int32.instance.value
+                local.get $right
+                call $Int32.instance.value
+                i32.le_s
+                call $Int32.instance.constructor
+                return
+            ))
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $__le__.print (param $print i32)
+            call $write.__le__
+            return
+        )
+    ;; }
+
+    ;; { __mul__
+        (func $sizeof.__mul__ (result i32)
+            i32.const 4
+            return
+        )
+        (func $__mul__.constructor (result i32)
+            (local $__mul__ i32)
+            ;; allocate
+            call $sizeof.__mul__
+            call $mem.allocate
+            local.set $__mul__
+            ;; __mul__.type = type.__mul__
+            local.get $__mul__
+            call $type.__mul__
+            call $something.type.set
+            ;; return
+            local.get $__mul__
+            return
+        )
+        (func $__mul__.call (param $__mul__ i32) (param $input i32) (result i32)
+            (local $left i32)
+            (local $right i32)
+
+            local.get $input
+            i32.const 0
+            call $virtual.unpack
+            local.set $left
+
+            local.get $input
+            i32.const 1
+            call $virtual.unpack
+            local.set $right
+
+            local.get $left
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            local.get $right
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            i32.and
+            (if (then
+                local.get $left
+                call $Int32.instance.value
+                local.get $right
+                call $Int32.instance.value
+                i32.mul
+                call $Int32.instance.constructor
+                return
+            ))
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $__mul__.print (param $print i32)
+            call $write.__mul__
+            return
+        )
+    ;; }
+
+    ;; { __sub__
+        (func $sizeof.__sub__ (result i32)
+            i32.const 4
+            return
+        )
+        (func $__sub__.constructor (result i32)
+            (local $__sub__ i32)
+            ;; allocate
+            call $sizeof.__sub__
+            call $mem.allocate
+            local.set $__sub__
+            ;; __sub__.type = type.__sub__
+            local.get $__sub__
+            call $type.__sub__
+            call $something.type.set
+            ;; return
+            local.get $__sub__
+            return
+        )
+        (func $__sub__.call (param $__sub__ i32) (param $input i32) (result i32)
+            (local $left i32)
+            (local $right i32)
+
+            local.get $input
+            i32.const 0
+            call $virtual.unpack
+            local.set $left
+
+            local.get $input
+            i32.const 1
+            call $virtual.unpack
+            local.set $right
+
+            local.get $left
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            local.get $right
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            i32.and
+            (if (then
+                local.get $left
+                call $Int32.instance.value
+                local.get $right
+                call $Int32.instance.value
+                i32.sub
+                call $Int32.instance.constructor
+                return
+            ))
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $__sub__.print (param $print i32)
+            call $write.__sub__
+            return
+        )
     ;; }
 
     (func $init
@@ -818,6 +1057,18 @@
 
         call $global.print.address
         call $Print.constructor
+        i32.store
+
+        call $global.__le__.address
+        call $__le__.constructor
+        i32.store
+
+        call $global.__mul__.address
+        call $__mul__.constructor
+        i32.store
+
+        call $global.__sub__.address
+        call $__sub__.constructor
         i32.store
     )
 

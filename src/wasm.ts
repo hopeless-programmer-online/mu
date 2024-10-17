@@ -126,6 +126,21 @@ export class Translator {
                             `call $Variable.constructor\n` +
                             `local.set ${name}`
                         )
+                        case `__le__`: return (
+                            `call $global.__le__\n` +
+                            `call $Variable.constructor\n` +
+                            `local.set ${name}`
+                        )
+                        case `__mul__`: return (
+                            `call $global.__mul__\n` +
+                            `call $Variable.constructor\n` +
+                            `local.set ${name}`
+                        )
+                        case `__sub__`: return (
+                            `call $global.__sub__\n` +
+                            `call $Variable.constructor\n` +
+                            `local.set ${name}`
+                        )
                     }
 
                     throw new Error // @todo
@@ -163,6 +178,18 @@ export class Translator {
                     )
                 }
                 else if (statement.symbol === semantic.IfStatement.symbol) {
+                    const condition = variables_naming.get(statement.condition)
+
+                    return (
+                        `local.get ${condition}\n` +
+                        `call $Variable.target\n` +
+                        `call $virtual.if\n` +
+                        `(if\n` +
+                        `    (then\n` +
+                        tab(stringify_statement(statement.then), `    `.repeat(2)) + `\n` +
+                        `    )\n` +
+                        `)`
+                    )
                     throw new Error // @todo
                 }
                 else if (statement.symbol === semantic.PackStatement.symbol) {
