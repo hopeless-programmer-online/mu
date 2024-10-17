@@ -13,6 +13,7 @@
         "strict"           : true,
         "skipLibCheck"     : true,
         "moduleResolution" : "Node",
+        "module"           : "CommonJS",
         "esModuleInterop"  : true,
         "outDir"           : "dist",
         "declaration"      : true,
