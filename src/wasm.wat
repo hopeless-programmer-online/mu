@@ -10,6 +10,7 @@
         (data (i32.const 6)  "unknown") (; 6 + 7 = 13 ;)     (func $write.unknown (call $print.ascii (i32.const 6) (i32.const 7)))
         (data (i32.const 13) "nothing") (; 13 + 7 = 20 ;)    (func $write.nothing (call $print.ascii (i32.const 13) (i32.const 7)))
         (data (i32.const 20) "print")   (; 20 + 5 = 25 ;)    (func $write.print   (call $print.ascii (i32.const 20) (i32.const 5)))
+        (data (i32.const 25) "pack")    (; 25 + 4 = 29 ;)    (func $write.pack    (call $print.ascii (i32.const 25) (i32.const 4)))
         ;; globals
         (func $global.nothing.address (result i32) i32.const 768 return) (func $global.nothing (result i32) call $global.nothing.address i32.load return)
         (func $global.print.address   (result i32) i32.const 772 return) (func $global.print   (result i32) call $global.print.address i32.load return)
@@ -343,6 +344,7 @@
         (func $type.Print            (result i32) i32.const 1 return)
         (func $type.Int32.instance   (result i32) i32.const 2 return)
         (func $type.Program.instance (result i32) i32.const 3 return)
+        (func $type.Pack.instance    (result i32) i32.const 4 return)
     ;; }
 
     (table 100 funcref)
@@ -354,6 +356,7 @@
                 $Print.call            ;; Print
                 $virtual.call.error    ;; Int32.instance
                 $Program.instance.call ;; Program.instance
+                $virtual.call.error    ;; Pack.instance
             )
             (type $virtual.call (func (param $something i32) (param $input i32) (result i32)))
             (func $virtual.call (param $something i32) (param $input i32) (result i32)
@@ -377,12 +380,13 @@
         ;; }
 
         ;; { print
-            (func $virtual.print.offset (result i32) i32.const 50)
-            (elem (i32.const 50)
+            (func $virtual.print.offset (result i32) i32.const 20)
+            (elem (i32.const 20)
                 $Nothing.print         ;; Nothing
                 $Print.print           ;; Print
                 $Int32.instance.print  ;; Int32.instance
                 $virtual.print.unknown ;; Program.instance
+                $Pack.instance.print   ;; Pack.instance
             )
             (type $virtual.print (func (param $something i32)))
             (func $virtual.print (param $something i32)
@@ -396,6 +400,32 @@
             )
             (func $virtual.print.unknown (param $something i32)
                 call $write.unknown
+                return
+            )
+        ;; }
+
+        ;; { unpack
+            (func $virtual.unpack.offset (result i32) i32.const 40)
+            (elem (i32.const 40)
+                $virtual.unpack.unknown ;; Nothing
+                $virtual.unpack.unknown ;; Print
+                $virtual.unpack.unknown ;; Int32.instance
+                $virtual.unpack.unknown ;; Program.instance
+                $Pack.instance.unpack   ;; Pack.instance
+            )
+            (type $virtual.unpack (func (param $something i32) (param $index i32) (result i32)))
+            (func $virtual.unpack (param $something i32) (param $index i32) (result i32)
+                local.get $something
+                local.get $index
+
+                local.get $something
+                call $something.type
+                call $virtual.unpack.offset
+                i32.add
+                call_indirect (type $virtual.unpack)
+            )
+            (func $virtual.unpack.unknown (param $something i32) (param $index i32) (result i32)
+                call $global.nothing
                 return
             )
         ;; }
@@ -498,6 +528,96 @@
             ;; return
             local.get $variable
             return
+        )
+    ;; }
+
+    ;; { Pack
+        (func $sizeof.Pack.instance.header (result i32)
+            i32.const 8
+            return
+        )
+        (func $sizeof.Pack.instance (param $length i32) (result i32)
+            local.get $length
+            i32.const 4
+            i32.mul
+            call $sizeof.Pack.instance.header
+            i32.add
+            return
+        )
+        (func $Pack.instance.length.offset (result i32)
+            i32.const 4
+            return
+        )
+        (func $Pack.instance.length (param $pack i32) (result i32)
+            local.get $pack
+            call $Pack.instance.length.offset
+            i32.add
+            i32.load
+            return
+        )
+        (func $Pack.instance.length.set (param $pack i32) (param $length i32)
+            local.get $pack
+            call $Pack.instance.length.offset
+            i32.add
+            local.get $length
+            i32.store
+        )
+        (func $Pack.instance.first.offset (result i32)
+            call $sizeof.Pack.instance.header
+            return
+        )
+        (func $Pack.instance.first (param $pack i32) (result i32)
+            local.get $pack
+            call $Pack.instance.first.offset
+            i32.add
+            return
+        )
+        (func $Pack.instance.set_at (param $pack i32) (param $index i32) (param $value i32)
+            local.get $pack
+            call $Pack.instance.first
+            local.get $index
+            i32.const 4
+            i32.mul
+            i32.add
+            local.get $value
+            i32.store
+        )
+        (func $Pack.instance.get_at (param $pack i32) (param $index i32) (result i32)
+            local.get $pack
+            call $Pack.instance.first
+            local.get $index
+            i32.const 4
+            i32.mul
+            i32.add
+            i32.load
+            return
+        )
+        (func $Pack.instance.constructor (param $length i32) (result i32)
+            (local $pack i32)
+            ;; allocate
+            local.get $length
+            call $sizeof.Pack.instance
+            call $mem.allocate
+            local.set $pack
+            ;; pack.type = type.Pack.instance
+            local.get $pack
+            call $type.Pack.instance
+            call $something.type.set
+            ;; pack.length = length
+            local.get $pack
+            local.get $length
+            call $Pack.instance.length.set
+            ;; return pack
+            local.get $pack
+            return
+        )
+        (func $Pack.instance.print (param $pack i32)
+            call $write.pack
+        )
+        (func $Pack.instance.unpack (param $pack i32) (param $index i32) (result i32)
+            local.get $pack
+            local.get $index
+            call $Pack.instance.get_at
         )
     ;; }
 
@@ -688,12 +808,6 @@
             call $print.int32
         )
     ;; }
-
-    (func $call (param $target i32) (param $input i32) (result i32)
-        local.get $target
-        local.get $input
-        call $virtual.call
-    )
 
     (func $init
         call $heap.init

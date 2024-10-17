@@ -18,7 +18,9 @@ class VariablesMapper {
             return name
         }
 
-        name = `$v${this.lookup.size}`
+        name = variable.symbol === semantic.InputVariable.symbol
+            ? `$input`
+            : `$v${this.lookup.size}`
 
         this.lookup.set(variable, name)
 
@@ -57,7 +59,7 @@ export class Translator {
         const variables_naming = new VariablesMapper
         const programs_naming = new ProgramsMapper
 
-        const stringify_variables = (variables : readonly semantic.VariableUnion[]) => {
+        const stringify_variables = (variables : readonly semantic.FrameVariableUnion[]) => {
             return (
                 variables
                 .map(x => `(local ${variables_naming.get(x)} i32)`)
@@ -87,10 +89,8 @@ export class Translator {
                         `local.get $program\n` +
                         `i32.const ${index}\n` +
                         `call $Program.instance.closure.get_at\n` +
-                        // `call $Variable.constructor\n` +
                         `local.set ${name}`
                     )
-                    // throw new Error // @todo
                 }
                 else if (variable.symbol === semantic.LiteralVariable.symbol) {
                     const { literal } = variable
@@ -131,12 +131,11 @@ export class Translator {
                     throw new Error // @todo
                 }
                 else if (variable.symbol === semantic.ParameterVariable.symbol) {
-                    // return (
-                    //     `call $global.nothing\n` +
-                    //     `call $Variable.constructor\n` +
-                    //     `local.set ${name}`
-                    // )
-                    throw new Error // @todo
+                    return (
+                        `call $global.nothing\n` +
+                        `call $Variable.constructor\n` +
+                        `local.set ${name}`
+                    )
                 }
                 else assert_never(variable, new Error) // @todo
             }
@@ -159,7 +158,7 @@ export class Translator {
                         `    call $Variable.target\n` +
                         `    local.get ${input}\n` +
                         `    call $Variable.target\n` +
-                        `    call $call\n` +
+                        `    call $virtual.call\n` +
                         `call $Variable.target.set`
                     )
                 }
@@ -167,7 +166,26 @@ export class Translator {
                     throw new Error // @todo
                 }
                 else if (statement.symbol === semantic.PackStatement.symbol) {
-                    throw new Error // @todo
+                    const output = variables_naming.get(statement.output)
+                    const inputs = statement.inputs.map(x => variables_naming.get(x))
+
+                    return (
+                        `local.get ${output}\n` +
+                        `i32.const ${inputs.length}\n` +
+                        `call $Pack.instance.constructor\n` +
+                        `call $Variable.target.set\n` +
+                        `\n` +
+                        inputs.map((input, i) =>
+                            `local.get ${output}\n` +
+                            `call $Variable.target\n` +
+                            `    i32.const ${i}\n` +
+                            `    local.get ${input}\n` +
+                            `    call $Variable.target\n` +
+                            `call $Pack.instance.set_at`
+                        )
+                        .map(x => tab(x))
+                        .join(`\n\n`)
+                    )
                 }
                 else if (statement.symbol === semantic.BlockStatement.symbol) {
                     return stringify_statements(statement.statements.array)
@@ -212,19 +230,28 @@ export class Translator {
                     const output = variables_naming.get(statement.output)
 
                     return (
+                        `local.get ${output}\n` +
                         `local.get ${input}\n` +
-                        `local.set ${output}`
+                        `call $Variable.target\n` +
+                        `call $Variable.target.set`
                     )
                 }
                 else if (statement.symbol === semantic.UnpackStatement.symbol) {
-//                     const input  = variables_naming.get(statement.input)
-//                     const output = variables_naming.get(statement.output)
-//
-//                     return (
-//                         `local.get ${input}\n` +
-//                         `local.set ${output}`
-//                     )
-                    throw new Error // @todo
+                    const input   = variables_naming.get(statement.input)
+                    const outputs = statement.outputs.map(x => variables_naming.get(x))
+
+                    return (
+                        outputs
+                        .map((output, index) =>
+                            `local.get ${output}\n` +
+                            `    local.get ${input}\n` +
+                            `    call $Variable.target\n` +
+                            `    i32.const ${index}\n` +
+                            `    call $virtual.unpack\n` +
+                            `call $Variable.target.set`
+                        )
+                        .join(`\n\n`)
+                    )
                 }
                 else assert_never(statement, new Error) // @todo
             }
@@ -239,6 +266,10 @@ export class Translator {
                 return (
                     `(func ${programs_naming.get(program)} (param $program i32) (param $input i32) (result i32)\n` +
                     tab(stringify_variables(program.variables.array)) + `\n` +
+                    `    \n` +
+                    `    local.get $input\n` +
+                    `    call $Variable.constructor\n` +
+                    `    local.set $input\n` +
                     `    \n` +
                     tab(initialize_variables(program.variables.array, program)) + `\n` +
                     `    \n` +
