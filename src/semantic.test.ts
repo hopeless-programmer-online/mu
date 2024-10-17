@@ -2,7 +2,7 @@ import { Analyzer as SyntaxAnalyzer } from './syntax'
 import { Analyzer as SemanticAnalyzer } from './semantic'
 
 async function parse(text : string) {
-    const syntax_analyzer = await SyntaxAnalyzer.create()
+    const syntax_analyzer = new SyntaxAnalyzer
     const root = syntax_analyzer.analyze_text(text)
     const semantic_analyzer = new SemanticAnalyzer
     const file =  semantic_analyzer.analyze(root)

@@ -2,6 +2,7 @@ import { join as join_path } from 'path'
 import { readFile } from 'fs-extra'
 import { Grammars, IToken } from 'ebnf'
 import { tab } from './utilities'
+import grammar from './grammar'
 
 
 export class File {
@@ -350,15 +351,9 @@ export class Program {
 }
 
 export class Analyzer {
-    public static async create() {
-        const grammar = await readFile(join_path(__dirname, `grammar.ebnf`), `utf8`)
-
-        return new Analyzer({ grammar })
-    }
-
     private parser : Grammars.W3C.Parser;
 
-    private constructor({ grammar } : { grammar : string }) {
+    public constructor() {
         this.parser = new Grammars.W3C.Parser(grammar)
     }
 

@@ -8,7 +8,7 @@ import { tab } from './src/utilities'
 
 export default async function main() {
     const text = await readFile(join_path(__dirname, `1.mu`), `utf8`)
-    const syntax_analyzer = await SyntaxAnalyzer.create()
+    const syntax_analyzer = new SyntaxAnalyzer
     const root = syntax_analyzer.analyze_text(text)
 
     // console.log(inspect(root, { depth : 10 }))

@@ -1,7 +1,7 @@
 import { Analyzer } from './syntax'
 
 async function parse(text : string) {
-    const analyzer = await Analyzer.create()
+    const analyzer = new Analyzer
 
     return analyzer.analyze_text(text).toString()
 }
