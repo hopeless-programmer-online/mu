@@ -1,5 +1,3 @@
-import { join as join_path } from 'path'
-import { readFile } from 'fs-extra'
 import { Grammars, IToken } from 'ebnf'
 import { tab } from './utilities'
 import grammar from './grammar'
@@ -577,11 +575,5 @@ export class Analyzer {
         const root = this.parser.getAST(text)
 
         return this.check_file(root)
-    }
-
-    public async analyze_file(path : string) {
-        const text = await readFile(path, `utf8`)
-
-        return this.analyze_text(text)
     }
 }
