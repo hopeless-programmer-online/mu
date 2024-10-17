@@ -16,13 +16,19 @@ export default async function main() {
     const semantic_analyzer = new SemanticAnalyzer
     const file =  semantic_analyzer.analyze(root)
     const translator = new Translator
-    const main = translator.translate(file)
-    const template = await readFile(join_path(__dirname, `src/wasm.wat`), `utf8`)
-    const wat = template.replace(/    \(func \$main\)/, tab(main))
+    const { main, table } = translator.translate(file)
 
-    // console.log(wat)
+    // console.log(main)
+
+    const template = await readFile(join_path(__dirname, `src/wasm.wat`), `utf8`)
+    const wat = template
+        .replace(/    \(func \$main\)/, tab(main))
+        .replace(/\(table 100 funcref\)/, `(table ${100 + file.programs.length} funcref)`)
+        .replace(/\(elem \(i32.const 100\)\)/, table)
 
     await writeFile(join_path(__dirname, `1.wat`), wat)
+
+    // const wat = await readFile(join_path(__dirname, `1.wat`), `utf8`)
 
     const wabt = await Wabt()
     const wasm = wabt.parseWat(`main.wat`, wat).toBinary({}).buffer
@@ -46,9 +52,9 @@ export default async function main() {
     const instance = await WebAssembly.instantiate(module, imports)
     const { exports } = instance
     const memory = exports.memory as WebAssembly.Memory
-    const result = (exports.main as () => number)()
 
-    // console.log(result)
+    (exports.main as () => void)()
+
     console.log(`done`)
 }
 

@@ -2,7 +2,13 @@
   "name": "mu",
   "version": "0.1.0",
   "description": "Mu (μ) programming language.",
+  "main": "./dist/mu.js",
+  "exports": {
+    ".": "./dist/mu.js"
+  },
   "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
     "test": "jest"
   },
   "repository": {

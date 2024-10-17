@@ -1,9 +1,19 @@
 {
+    /* https://aka.ms/tsconfig.json */
+    "include": [
+        "./src/"
+    ],
+    "exclude": [
+        "node_modules",
+        "./src/**/**.test.ts"
+    ],
     "compilerOptions": {
         "target"           : "es2016",
         "strict"           : true,
         "skipLibCheck"     : true,
         "moduleResolution" : "Node",
         "esModuleInterop"  : true,
+        "outDir"           : "dist",
+        "declaration"      : true,
     }
 }
