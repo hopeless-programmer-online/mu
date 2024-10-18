@@ -97,3 +97,9 @@ it(`Empty program`, async () => {
         `program() return\n`
     )
 })
+
+it(`Subtraction`, async () => {
+    expect(await parse(`a - b`)).toBe(
+        `a - b\n`
+    )
+})

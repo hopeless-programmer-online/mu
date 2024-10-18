@@ -654,6 +654,8 @@ class Names {
     private _map = new Map<string, Name>()
 
     private get_text(source : NameSource) {
+        if (source.symbol === syntax.BinaryOperatorExpression.symbol) return get_operator_name(source.operator)
+
         if (source.symbol === syntax.NoneExpression.symbol) return `nothing`
         else if (source.symbol === syntax.NameExpression.symbol) return source.name.text
         else if (source.symbol === syntax.NameDestructuring.symbol) return source.name.text
@@ -700,7 +702,7 @@ class Names {
     }
 }
 
-type NameSource = syntax.NoneExpression | syntax.NameExpression | syntax.NameDestructuring
+type NameSource = syntax.NoneExpression | syntax.NameExpression | syntax.NameDestructuring | syntax.BinaryOperatorExpression
 
 function process_file(source : syntax.File) {
     const names = new Names
@@ -765,6 +767,12 @@ function scan_expression(exp : syntax.ExpressionUnion, names : Names) {
     }
     else if (exp.symbol === syntax.ProgramExpression.symbol) {
         // do nothing
+    }
+    else if (exp.symbol === syntax.BinaryOperatorExpression.symbol) {
+        names.add_usage(exp)
+
+        scan_expression(exp.left, names)
+        scan_expression(exp.right, names)
     }
     else assert_never(exp, new Error) // @todo
 }
@@ -843,6 +851,16 @@ function process_expression(exp : syntax.ExpressionUnion, exe : ExecutableUnion)
     else if (exp.symbol === syntax.ProgramExpression.symbol) {
         return process_program(exp, exe).variable
     }
+    else if (exp.symbol === syntax.BinaryOperatorExpression.symbol) {
+        const name = get_operator_name(exp.operator)
+        const op = exe.frame.variables.get_by_name(name)
+        const left = process_expression(exp.left, exe)
+        const right = process_expression(exp.right, exe)
+        const pack = exe.statements.add_pack([ op, right ])
+        const call = exe.statements.add_call(left, pack.output)
+
+        return call.output
+    }
     else assert_never(exp, new Error) // @todo
 }
 
@@ -906,4 +924,9 @@ function process_program(exp : syntax.ProgramExpression, exe : ExecutableUnion) 
     process_statement(exp.program.body, prog)
 
     return exe.statements.add_program(prog)
+}
+
+function get_operator_name(op : syntax.BinaryOperator) {
+    if (op === syntax.BinaryOperator.subtraction) return `__sub__`
+    else assert_never(op, new Error) // @todo
 }

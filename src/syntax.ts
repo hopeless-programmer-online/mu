@@ -155,6 +155,40 @@ export class NameExpression {
     }
 }
 
+export enum BinaryOperator {
+    subtraction = `-`,
+}
+
+export class BinaryOperatorExpression {
+    public static readonly symbol = Symbol(`syntax.BinaryOperatorExpression.symbol`)
+
+    public readonly operator : BinaryOperator
+    public readonly left     : ExpressionUnion
+    public readonly right    : ExpressionUnion
+
+    public constructor({
+        operator,
+        left,
+        right,
+    } : {
+        operator : BinaryOperator
+        left     : ExpressionUnion
+        right    : ExpressionUnion
+    }) {
+        this.operator = operator
+        this.left     = left
+        this.right    = right
+    }
+
+    public get symbol() : typeof BinaryOperatorExpression.symbol {
+        return BinaryOperatorExpression.symbol
+    }
+
+    public toString() {
+        return `${this.left} ${this.operator} ${this.right}`
+    }
+}
+
 export class AssignmentExpression {
     public static readonly symbol = Symbol(`syntax.AssignmentExpression.symbol`)
 
@@ -231,7 +265,7 @@ export class CallExpression {
     }
 }
 
-export type ExpressionUnion = NoneExpression | LiteralExpression | NameExpression | AssignmentExpression | ListExpression | ProgramExpression | CallExpression
+export type ExpressionUnion = NoneExpression | LiteralExpression | NameExpression | AssignmentExpression | ListExpression | ProgramExpression | CallExpression | BinaryOperatorExpression
 
 export class IntegerLiteral {
     public static readonly symbol = Symbol(`syntax.IntegerLiteral.symbol`)
@@ -400,9 +434,27 @@ export class Analyzer {
             case `assignment` : return this.check_assignment(token)
             case `program`    : return new ProgramExpression({ program : this.check_program(token) })
             case `e_list`     : return this.check_expression_list(token)
+            case `binary`     : return this.check_binary(token)
         }
 
         throw new Error(`Unsupported expression type: ${token.type}`)
+    }
+
+    private check_binary = (token : IToken) : ExpressionUnion => {
+        if (token.type !== `binary`) throw new Error
+        if (token.children.length !== 1) throw new Error
+
+        token = token.children[0]
+
+        switch (token.type) {
+            case `sub` : return new BinaryOperatorExpression({
+                operator : BinaryOperator.subtraction,
+                left     : this.check_expression_terminal(token.children[0]),
+                right    : this.check_expression(token.children[1]),
+            })
+        }
+
+        throw new Error(`Unsupported binary type: ${token.type}`)
     }
 
     private check_expression_terminal(token : IToken) {

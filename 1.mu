@@ -1,7 +1,7 @@
-fact = program(x) {
-    if __le__(x, 1) then return 1
-
-    return __mul__( x, fact( __sub__(x, 1) ) )
+f = program(params) {
+    print(params)
 }
 
-print( fact(5) )
+f - 5
+
+print(42)

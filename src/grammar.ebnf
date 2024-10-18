@@ -7,13 +7,16 @@ if         ::= "if" SPACE? expression SPACE? "then" SPACE? statement
 return     ::= "return" SPACE? expression?
 block      ::= "{" SPACE? (statements SPACE?)? "}"
 
-expression ::= program | call | assignment | e_list | e_terminal
+expression ::= program | binary | call | assignment | e_list | e_terminal
 program    ::= "program" SPACE? t_group SPACE? statement
 call       ::= e_terminal SPACE? e_group
 assignment ::= target SPACE? "=" SPACE? expression
 e_terminal ::= e_group | name | literal
 e_group    ::= "(" SPACE? (expression SPACE?)? ")"
 e_list     ::= e_terminal SPACE? "," (SPACE? expression (SPACE? "," SPACE? expression)* SPACE? ","?)?
+
+binary     ::= sub
+sub        ::= e_terminal SPACE? "-" SPACE? expression
 
 target     ::= t_list | t_terminal
 t_terminal ::= t_group | name
