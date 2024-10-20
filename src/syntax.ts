@@ -156,7 +156,9 @@ export class NameExpression {
 }
 
 export enum BinaryOperator {
-    subtraction = `-`,
+    subtraction    = `-`,
+    multiplication = `*`,
+    less_equal     = `<=`,
 }
 
 export class BinaryOperatorExpression {
@@ -185,6 +187,7 @@ export class BinaryOperatorExpression {
     }
 
     public toString() {
+        // @todo: wrap?
         return `${this.left} ${this.operator} ${this.right}`
     }
 }
@@ -426,35 +429,87 @@ export class Analyzer {
         if (token.type !== `expression`) throw new Error
         if (token.children.length !== 1) throw new Error
 
-        token = token.children[0]
-
-        switch (token.type) {
-            case `e_terminal` : return this.check_expression_terminal(token)
-            case `call`       : return this.check_call(token)
-            case `assignment` : return this.check_assignment(token)
-            case `program`    : return new ProgramExpression({ program : this.check_program(token) })
-            case `e_list`     : return this.check_expression_list(token)
-            case `binary`     : return this.check_binary(token)
-        }
-
-        throw new Error(`Unsupported expression type: ${token.type}`)
+        return this.check_le_sub_mul_atom(token.children[0])
     }
 
-    private check_binary = (token : IToken) : ExpressionUnion => {
-        if (token.type !== `binary`) throw new Error
+    private check_atom = (token : IToken) : ExpressionUnion => {
+        if (token.type !== `atom`) throw new Error
         if (token.children.length !== 1) throw new Error
 
         token = token.children[0]
 
         switch (token.type) {
-            case `sub` : return new BinaryOperatorExpression({
-                operator : BinaryOperator.subtraction,
-                left     : this.check_expression_terminal(token.children[0]),
-                right    : this.check_expression(token.children[1]),
-            })
+            case `program`    : return new ProgramExpression({ program : this.check_program(token) })
+            case `call`       : return this.check_call(token)
+            case `assignment` : return this.check_assignment(token)
+            case `e_list`     : return this.check_expression_list(token)
+            case `e_terminal` : return this.check_expression_terminal(token)
         }
 
-        throw new Error(`Unsupported binary type: ${token.type}`)
+        throw new Error(`Unsupported expression type: ${token.type}`)
+    }
+
+    private check_le_sub_mul_atom(token : IToken) {
+        switch (token.type) {
+            case `le`   : return this.check_le(token)
+            case `sub`  : return this.check_sub(token)
+            case `mul`  : return this.check_mul(token)
+            case `atom` : return this.check_atom(token)
+        }
+
+        throw new Error // @todo
+    }
+
+    private check_le = (token : IToken) : ExpressionUnion => {
+        if (token.type !== `le`) throw new Error
+        if (token.children.length !== 2) throw new Error
+
+        return new BinaryOperatorExpression({
+            operator : BinaryOperator.less_equal,
+            left     : this.check_sub_mul_atom(token.children[0]),
+            right    : this.check_le_sub_mul_atom(token.children[1]),
+        })
+    }
+
+    private check_sub_mul_atom(token : IToken) {
+        switch (token.type) {
+            case `sub`  : return this.check_sub(token)
+            case `mul`  : return this.check_mul(token)
+            case `atom` : return this.check_atom(token)
+        }
+
+        throw new Error // @todo
+    }
+
+    private check_sub = (token : IToken) : ExpressionUnion => {
+        if (token.type !== `sub`) throw new Error
+        if (token.children.length !== 2) throw new Error
+
+        return new BinaryOperatorExpression({
+            operator : BinaryOperator.subtraction,
+            left     : this.check_mul_atom(token.children[0]),
+            right    : this.check_sub_mul_atom(token.children[1]),
+        })
+    }
+
+    private check_mul_atom(token : IToken) {
+        switch (token.type) {
+            case `mul`  : return this.check_mul(token)
+            case `atom` : return this.check_atom(token)
+        }
+
+        throw new Error(`Unexpected token type ${token.type}`)
+    }
+
+    private check_mul = (token : IToken) : ExpressionUnion => {
+        if (token.type !== `mul`) throw new Error
+        if (token.children.length !== 2) throw new Error
+
+        return new BinaryOperatorExpression({
+            operator : BinaryOperator.multiplication,
+            left     : this.check_atom(token.children[0]),
+            right    : this.check_mul_atom(token.children[1]),
+        })
     }
 
     private check_expression_terminal(token : IToken) {

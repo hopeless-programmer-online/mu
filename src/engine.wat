@@ -363,7 +363,7 @@
             (elem (i32.const 0)
                 $virtual.call.error    ;; Nothing
                 $Print.call            ;; Print
-                $virtual.call.error    ;; Int32.instance
+                $Int32.instance.call   ;; Int32.instance
                 $Program.instance.call ;; Program.instance
                 $virtual.call.error    ;; Pack.instance
                 $__le__.call           ;; __le__
@@ -577,7 +577,7 @@
         )
     ;; }
 
-    ;; { Pack
+    ;; { Pack.instance
         (func $sizeof.Pack.instance.header (result i32)
             i32.const 8
             return
@@ -846,6 +846,127 @@
             call $Int32.instance.value.set
             ;; return int32
             local.get $int32
+            return
+        )
+        (func $Int32.instance.__sub__ (param $int32 i32) (param $right i32) (result i32)
+            local.get $right
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            (if (then
+                local.get $int32
+                call $Int32.instance.value
+                local.get $right
+                call $Int32.instance.value
+                i32.sub
+                call $Int32.instance.constructor
+                return
+            ))
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $Int32.instance.__mul__ (param $int32 i32) (param $right i32) (result i32)
+            local.get $right
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            (if (then
+                local.get $int32
+                call $Int32.instance.value
+                local.get $right
+                call $Int32.instance.value
+                i32.mul
+                call $Int32.instance.constructor
+                return
+            ))
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $Int32.instance.__le__ (param $int32 i32) (param $right i32) (result i32)
+            local.get $right
+            call $something.type
+            call $type.Int32.instance
+            i32.eq
+            (if (then
+                local.get $int32
+                call $Int32.instance.value
+                local.get $right
+                call $Int32.instance.value
+                i32.le_s
+                call $Int32.instance.constructor
+                return
+            ))
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $Int32.instance.call_pack (param $int32 i32) (param $pack i32) (result i32)
+            (local $message i32)
+
+            local.get $pack
+            i32.const 0
+            call $Pack.instance.get_at
+            local.set $message
+
+            local.get $message
+            call $global.__mul__
+            i32.eq
+            (if (then
+                local.get $int32
+                local.get $pack
+                i32.const 1
+                call $Pack.instance.get_at
+                call $Int32.instance.__mul__
+                return
+            ))
+
+            local.get $message
+            call $global.__sub__
+            i32.eq
+            (if (then
+                local.get $int32
+                local.get $pack
+                i32.const 1
+                call $Pack.instance.get_at
+                call $Int32.instance.__sub__
+                return
+            ))
+
+            local.get $message
+            call $global.__le__
+            i32.eq
+            (if (then
+                local.get $int32
+                local.get $pack
+                i32.const 1
+                call $Pack.instance.get_at
+                call $Int32.instance.__le__
+                return
+            ))
+
+            ;; return
+            call $global.nothing
+            return
+        )
+        (func $Int32.instance.call (param $int32 i32) (param $input i32) (result i32)
+            local.get $input
+            call $something.type
+            call $type.Pack.instance
+            i32.eq
+            (if (then
+                local.get $int32
+                local.get $input
+                call $Int32.instance.call_pack
+                return
+            ))
+
+            ;; return
+            call $global.nothing
             return
         )
         (func $Int32.instance.print (param $int32 i32)

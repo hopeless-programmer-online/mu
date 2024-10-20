@@ -525,6 +525,11 @@ class FrameVariables {
     private assert_not_existed(name : string) {
         if (this.find_by_name(name)) throw new Error(`Variable with name ${name} already exists.`)
     }
+    private assert_not_existed_recursive(name : string) {
+        this.assert_not_existed(name)
+
+        if (this.frame.symbol !== File.symbol) this.frame.parent.variables.assert_not_existed_recursive(name)
+    }
     private add<T extends FrameVariableUnion>(variable : T) {
         this._array.push(variable)
 
@@ -541,6 +546,19 @@ class FrameVariables {
             false
 
         return this._array.find(match) || null
+    }
+    public find_by_name_or_add_closure(name : string) : FrameVariableUnion | null {
+        const existed = this.find_by_name(name)
+
+        if (existed) return existed
+
+        if (this.frame.symbol === File.symbol) return null
+
+        const source = this.frame.parent.variables.find_by_name_or_add_closure(name)
+
+        if (!source) return null
+
+        return this.add_closure(source)
     }
     public get_by_name(name : string) {
         const existed = this.find_by_name(name)
@@ -568,6 +586,8 @@ class FrameVariables {
 
         const { frame } = this
 
+        if (frame.symbol !== File.symbol) throw new Error // @todo
+
         return this.add(new ExternalVariable({ name, frame }))
     }
     public get_or_add_external(name : string) {
@@ -576,6 +596,15 @@ class FrameVariables {
         if (existed) return existed
 
         return this.add_external(name)
+    }
+    public add_external_closure(name : string) : FrameVariableUnion {
+        this.assert_not_existed_recursive(name)
+
+        if (this.frame.symbol === File.symbol) return this.add_external(name)
+
+        const source = this.frame.parent.variables.add_external_closure(name)
+
+        return this.add_closure(source)
     }
     public add_unnamed() {
         const { frame } = this
@@ -890,16 +919,14 @@ function process_program(exp : syntax.ProgramExpression, exe : ExecutableUnion) 
     names.for_each(name => {
         // console.log(`${name}`)
 
-        if (!name.assigned && !name.parameter && name.used) {
-            exe.file.variables.get_or_add_external(name.text)
-        }
+        // parameters are added in scan_destructuring
         if (name.parameter) return
 
-        const source = exe.frame.variables.find_by_name(name.text)
+        const source = exe.frame.variables.find_by_name_or_add_closure(name.text)
 
-        if (!source) return // @todo: add local?
-
-        prog.variables.get_or_add_closure(source)
+        if (source) prog.variables.get_or_add_closure(source)
+        else if (name.assigned) prog.variables.add_local(name.text)
+        else prog.variables.add_external_closure(name.text)
     })
 
     function process_parameter(param : syntax.DestructuringUnion, input : VariableUnion) {
@@ -928,5 +955,7 @@ function process_program(exp : syntax.ProgramExpression, exe : ExecutableUnion) 
 
 function get_operator_name(op : syntax.BinaryOperator) {
     if (op === syntax.BinaryOperator.subtraction) return `__sub__`
+    else if (op === syntax.BinaryOperator.multiplication) return `__mul__`
+    else if (op === syntax.BinaryOperator.less_equal) return `__le__`
     else assert_never(op, new Error) // @todo
 }
