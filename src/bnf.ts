@@ -1,4 +1,4 @@
-import { assert_never } from './utilities'
+import { assert_never, tab } from './utilities'
 
 export class RuleExpression {
     public static readonly symbol = Symbol(`bnf.RuleExpression.symbol`)
@@ -123,6 +123,210 @@ export type ExpressionUnion =
     | AndExpression
     | OrExpression
 
+export class ParserGenerator {
+    public generate(root : ExpressionUnion) {
+        const rules : RuleExpression[] = []
+
+        function scan(exp : ExpressionUnion) {
+            if (exp.symbol === RuleExpression.symbol) {
+                if (rules.includes(exp)) return
+
+                rules.push(exp)
+
+                scan(exp.expression)
+            }
+            else if (exp.symbol === RepeatExpression.symbol) {
+                scan(exp.expression)
+            }
+            else if (exp.symbol === OptionalExpression.symbol) {
+                scan(exp.expression)
+            }
+            else if (exp.symbol === TextExpression.symbol) {
+                // do nothing
+            }
+            else if (exp.symbol === RangeExpression.symbol) {
+                // do nothing
+            }
+            else if (exp.symbol === AndExpression.symbol) {
+                exp.expressions.forEach(scan)
+            }
+            else if (exp.symbol === OrExpression.symbol) {
+                exp.expressions.forEach(scan)
+            }
+            else assert_never(exp, new Error) // @todo
+        }
+
+        scan(root)
+
+        function stringify(exp : ExpressionUnion, begin = `begin`) : string {
+            if (exp.symbol === RuleExpression.symbol) {
+                return `parse_${exp.name}(text, ${begin})?.end.offset`
+            }
+            else if (exp.symbol === RepeatExpression.symbol) {
+                return (
+                    `(begin => {\n` +
+                    `    let last = begin\n` +
+                    `    \n` +
+                    `    while (true) {\n` +
+                    tab(`const end = ${stringify(exp.expression, `last`)}`, `        `) + `\n` +
+                    `        if (end == null) return last\n` +
+                    `        last = end\n` +
+                    `    }\n` +
+                    `})(${begin})`
+                )
+            }
+            else if (exp.symbol === OptionalExpression.symbol) {
+                return (
+                    `(begin => {\n` +
+                    `    const end = ${stringify(exp.expression)}\n` +
+                    `    if (end != null) return end\n` +
+                    `    return begin\n` +
+                    `})(${begin})`
+                )
+            }
+            else if (exp.symbol === TextExpression.symbol) {
+                return `(begin => text.substring(begin, begin + ${exp.value.length}) === ${JSON.stringify(exp.value)} ? begin + ${exp.value.length} : null)(${begin})`
+            }
+            else if (exp.symbol === RangeExpression.symbol) {
+                return (
+                    `(begin => {\n` +
+                    `    const x = text.charCodeAt(begin)\n` +
+                    `    \n` +
+                    `    return (\n` +
+                    tab(exp.intervals
+                        .map(([ a, b ]) =>
+                            `(x >= ${a} && x <= ${b})`
+                        )
+                        .join(` ||\n`),
+                        `        `
+                    ) + `\n` +
+                    `    ) ? begin + 1 : null\n` +
+                    `})(${begin})`
+                )
+            }
+            else if (exp.symbol === AndExpression.symbol) {
+                return (
+                    `(begin => {\n` +
+                    `    let last = begin\n` +
+                    `    \n` +
+                    tab(exp.expressions
+                        .map((x, i) =>
+                            `const end${i} = ${stringify(x, `last`)}\n` +
+                            `if (end${i} == null) return null\n` +
+                            `last = end${i}\n`
+                        )
+                        .join(`\n`)
+                    ) + `\n` +
+                    `    return last\n` +
+                    `})(${begin})`
+                )
+            }
+            else if (exp.symbol === OrExpression.symbol) {
+                return (
+                    `(begin => {\n` +
+                    tab(exp.expressions
+                        .map((x, i) =>
+                            `const end${i} = ${stringify(x)}\n` +
+                            `if (end${i} != null) return end${i}\n`
+                        )
+                        .join(`\n`)
+                    ) + `\n` +
+                    `    return null\n` +
+                    `})(${begin})`
+                )
+            }
+            else assert_never(exp, new Error) // @todo
+        }
+
+        const header = (
+            `class Location {\n` +
+            `    public readonly offset : number\n` +
+            `    public readonly line   = 0\n` +
+            `    public readonly column = 0\n` +
+            `    \n` +
+            `    public constructor({\n` +
+            `        offset,\n` +
+            `    } : {\n` +
+            `        offset : number\n` +
+            `    }) {\n` +
+            `        this.offset = offset\n` +
+            `    }\n` +
+            `}\n` +
+            `\n` +
+            `class Expression {\n` +
+            `    public readonly begin : Location\n` +
+            `    public readonly end   : Location\n` +
+            `    \n` +
+            `    public constructor({\n` +
+            `        begin,\n` +
+            `        end,\n` +
+            `    } : {\n` +
+            `        begin : Location\n` +
+            `        end   : Location\n` +
+            `    }) {\n` +
+            `        this.begin = begin\n` +
+            `        this.end   = end\n` +
+            `    }\n` +
+            `}\n`
+        )
+
+        const classes = rules
+            .map(({ name }) => {
+                const class_name = `${to_pascal_case(name)}Expression`
+
+                return (
+                    `export class ${class_name} extends Expression {\n` +
+                    `    public static readonly symbol = Symbol("${class_name}.symbol")\n` +
+                    `    \n` +
+                    `    public get symbol() : typeof ${class_name}.symbol {\n` +
+                    `        return ${class_name}.symbol\n` +
+                    `    }\n` +
+                    `}\n`
+                )
+            })
+            .join(`\n`)
+
+        const functions = rules
+            .map(rule => {
+                const class_name = `${to_pascal_case(rule.name)}Expression`
+
+                return (
+                    `export function parse_${rule.name}(text : string, begin : number) : ${class_name} | null {\n` +
+                    tab(`const end = ${stringify(rule.expression)}\n`) +
+                    `    \n` +
+                    `    if (end == null) return null\n` +
+                    `    \n` +
+                    `    return new ${class_name}({\n` +
+                    `        begin : new Location({ offset : begin }),\n` +
+                    `        end   : new Location({ offset : end }),\n` +
+                    `    })\n` +
+                    `}\n`
+                )
+            })
+            .join(`\n`)
+
+        const exports = rules
+            .map(({ name }) => {
+                const class_name = `${to_pascal_case(name)}Expression`
+
+                return (
+                    `export { ${class_name} as ${to_pascal_case(name)} }\n`
+                )
+            })
+            .join(`\n`)
+
+        return (
+            header +
+            `\n` +
+            classes +
+            `\n` +
+            functions +
+            `\n` +
+            exports
+        )
+    }
+}
+
 export class Parser {
     public readonly rules : readonly RuleExpression[]
 
@@ -231,4 +435,8 @@ export function rep(expression : ExpressionUnion) {
 
 export function opt(expression : ExpressionUnion) {
     return new OptionalExpression({ expression })
+}
+
+function to_pascal_case(text : string) {
+    return text.replace(/(\w)(\w*)/g, function(g0,g1,g2){return g1.toUpperCase() + g2.toLowerCase();})
 }
