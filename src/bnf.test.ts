@@ -1,4 +1,4 @@
-import { Parser, rule, text, range, or, and, rep, opt } from './bnf'
+import { Parser, rule, text, range, or, and, seq, opt } from './bnf'
 
 it(``, () => {
     const a = rule(`a`, text(`a`))
@@ -50,7 +50,7 @@ it(``, () => {
 it(``, () => {
     const letter = rule(`letter`, range(`az`, `AZ`, `__`))
     const symbol = rule(`symbol`, range(`az`, `AZ`, `__`, `09`))
-    const name   = rule(`name`, and(letter, rep(symbol)))
+    const name   = rule(`name`, and(letter, seq(symbol)))
     const parser = new Parser({ rules : [ name ] })
 
     expect(parser.parse(`a`)).toBe(true)
@@ -63,11 +63,11 @@ it(``, () => {
 it(``, () => {
     const letter = rule(`letter`, range(`az`, `AZ`, `__`))
     const symbol = rule(`symbol`, range(`az`, `AZ`, `__`, `09`))
-    const name   = rule(`name`, and(letter, rep(symbol)))
-    const space  = rule(`space`, rep(range(`  `, `\n\n`, `\r\r`, `\t\t`)))
+    const name   = rule(`name`, and(letter, seq(symbol)))
+    const space  = rule(`space`, seq(range(`  `, `\n\n`, `\r\r`, `\t\t`)))
     const exp    = rule(`exp`)
     const line   = rule(`line`, and(name, space, text(`=`), space, exp))
-    const file   = rule(`file`, and(space, rep(and(line, space))))
+    const file   = rule(`file`, and(space, seq(and(line, space))))
 
     exp.expression = name
 
