@@ -1,27 +1,38 @@
 import { assert_never } from './utilities'
 
 abstract class Expression {
-    public get class_name() : string {
-        throw new Error // @todo
-    }
+//     public abstract get_class_name(visited : Set<Expression>) : string | null;
+//
+//     public get class_name()  {
+//         return this.get_class_name(new Set)
+//     }
+//     public get constructor_name() {
+//         const { class_name } = this
+//
+//         return class_name != null ? class_name : `Expression`
+//     }
 }
 
 export class RuleExpression extends Expression {
     public static readonly symbol = Symbol(`bnf.RuleExpression.symbol`)
 
-    private         _expression : ExpressionUnion | null
+    private _expression : ExpressionUnion | null
 
-    public readonly name        : string
+    public readonly class_name : string | null
+    public readonly name       : string
 
     public constructor({
+        class_name = null,
         name,
         expression = null,
     } : {
         name        : string
+        class_name? : string | null
         expression? : ExpressionUnion | null
     }) {
         super()
 
+        this.class_name  = class_name
         this.name        = name
         this._expression = expression
     }
@@ -30,9 +41,6 @@ export class RuleExpression extends Expression {
         return RuleExpression.symbol
     }
 
-    public get class_name() {
-        return `${this.exports_name}Expression`
-    }
     public get exports_name() {
         return to_pascal_case(this.name)
     }
@@ -70,9 +78,19 @@ export class RuleExpression extends Expression {
 
         return fields
     }
+
+//     public get_class_name(visited: Set<Expression>): string | null {
+//         if (visited.has(this)) return null
+//
+//         visited.add(this)
+//
+//         return this._class_name != null
+//             ? this._class_name
+//             : this.expression.get_class_name(visited)
+//     }
 }
 
-class WrapperExpression extends Expression {
+abstract class WrapperExpression extends Expression {
     public readonly expression : ExpressionUnion
 
     public constructor({ expression } : { expression : ExpressionUnion }) {
@@ -88,9 +106,10 @@ export class SequenceExpression extends WrapperExpression {
     public get symbol() : typeof SequenceExpression.symbol {
         return SequenceExpression.symbol
     }
-    public get class_name() : string {
-        return `${this.expression.class_name}[]`
-    }
+
+    // public get_class_name(visited: Set<Expression>): string | null {
+    //     return `(${this.expression.get_class_name(visited)})[]`
+    // }
 }
 
 export class OptionalExpression extends WrapperExpression {
@@ -99,6 +118,10 @@ export class OptionalExpression extends WrapperExpression {
     public get symbol() : typeof OptionalExpression.symbol {
         return OptionalExpression.symbol
     }
+
+    // public get_class_name(visited: Set<Expression>): string | null {
+    //     return `(${this.expression.get_class_name(visited)} | null)`
+    // }
 }
 
 export class TextExpression extends Expression {
@@ -115,9 +138,10 @@ export class TextExpression extends Expression {
     public get symbol() : typeof TextExpression.symbol {
         return TextExpression.symbol
     }
-    public get class_name() : string {
-        return `Expression`
-    }
+
+    // public get_class_name(visited: Set<Expression>) {
+    //     return null
+    // }
 }
 
 export class RangeExpression extends Expression {
@@ -134,12 +158,13 @@ export class RangeExpression extends Expression {
     public get symbol() : typeof RangeExpression.symbol {
         return RangeExpression.symbol
     }
-    public get class_name() : string {
-        return `Expression`
-    }
+
+    // public get_class_name(visited: Set<Expression>) {
+    //     return null
+    // }
 }
 
-class CollectionExpression extends Expression {
+abstract class CollectionExpression extends Expression {
     public readonly expressions : readonly ExpressionUnion[]
 
     public constructor({ expressions } : { expressions : readonly ExpressionUnion[] }) {
@@ -159,9 +184,16 @@ export class AndExpression extends CollectionExpression {
     public get symbol() : typeof AndExpression.symbol {
         return AndExpression.symbol
     }
-    public get class_name() : string {
-        return `[ ${this.expressions.map(x => x.class_name).join(`, `)} }`
-    }
+
+//     public get_class_name(visited: Set<Expression>): string | null {
+//         const expressions = this.expressions
+//             .map(x => x.get_class_name(visited))
+//             .filter((x) : x is string => x !== null)
+//
+//         return expressions.length > 0
+//             ? `[ ${expressions.join(`, `)} ]`
+//             : null
+//     }
 }
 
 export class OrExpression extends CollectionExpression {
@@ -170,9 +202,16 @@ export class OrExpression extends CollectionExpression {
     public get symbol() : typeof OrExpression.symbol {
         return OrExpression.symbol
     }
-    public get class_name() : string {
-        return this.expressions.map(x => x.class_name).join(` | `)
-    }
+
+//     public get_class_name(visited: Set<Expression>): string | null {
+//         const expressions = this.expressions
+//             .map(x => x.get_class_name(visited))
+//             .filter((x) : x is string => x !== null)
+//
+//         return expressions.length > 0
+//             ? `(${expressions.join(` | `)})`
+//             : null
+//     }
 }
 
 export class FieldExpression extends Expression {
@@ -197,6 +236,10 @@ export class FieldExpression extends Expression {
     public get symbol() : typeof FieldExpression.symbol {
         return FieldExpression.symbol
     }
+
+    // public get_class_name(visited: Set<Expression>): string | null {
+    //     return this.expression.get_class_name(visited)
+    // }
 }
 
 export type ExpressionUnion =
@@ -208,253 +251,6 @@ export type ExpressionUnion =
     | AndExpression
     | OrExpression
     | FieldExpression
-
-/*export class ParserGenerator {
-    public generate(root : ExpressionUnion) {
-        const rules : RuleExpression[] = []
-
-        function scan(exp : ExpressionUnion) {
-            if (exp.symbol === RuleExpression.symbol) {
-                if (rules.includes(exp)) return
-
-                rules.push(exp)
-
-                scan(exp.expression)
-            }
-            else if (exp.symbol === SequenceExpression.symbol) {
-                scan(exp.expression)
-            }
-            else if (exp.symbol === OptionalExpression.symbol) {
-                scan(exp.expression)
-            }
-            else if (exp.symbol === TextExpression.symbol) {
-                // do nothing
-            }
-            else if (exp.symbol === RangeExpression.symbol) {
-                // do nothing
-            }
-            else if (exp.symbol === AndExpression.symbol) {
-                exp.expressions.forEach(scan)
-            }
-            else if (exp.symbol === OrExpression.symbol) {
-                exp.expressions.forEach(scan)
-            }
-            else if (exp.symbol === FieldExpression.symbol) {
-                scan(exp.expression)
-            }
-            else assert_never(exp, new Error) // @todo
-        }
-
-        scan(root)
-
-        function stringify(exp : ExpressionUnion, begin = `begin`) : string {
-            if (exp.symbol === RuleExpression.symbol) {
-                return `parse_${exp.name}(text, ${begin})?.end.offset`
-            }
-            else if (exp.symbol === SequenceExpression.symbol) {
-                return (
-                    `(begin => {\n` +
-                    `    let last = begin\n` +
-                    `    \n` +
-                    `    while (true) {\n` +
-                    tab(`const end = ${stringify(exp.expression, `last`)}`, `        `) + `\n` +
-                    `        if (end == null) return last\n` +
-                    `        last = end\n` +
-                    `    }\n` +
-                    `})(${begin})`
-                )
-            }
-            else if (exp.symbol === OptionalExpression.symbol) {
-                return (
-                    `(begin => {\n` +
-                    `    const end = ${stringify(exp.expression)}\n` +
-                    `    if (end != null) return end\n` +
-                    `    return begin\n` +
-                    `})(${begin})`
-                )
-            }
-            else if (exp.symbol === TextExpression.symbol) {
-                return `(begin => text.substring(begin, begin + ${exp.value.length}) === ${JSON.stringify(exp.value)} ? begin + ${exp.value.length} : null)(${begin})`
-            }
-            else if (exp.symbol === RangeExpression.symbol) {
-                return (
-                    `(begin => {\n` +
-                    `    const x = text.charCodeAt(begin)\n` +
-                    `    \n` +
-                    `    return (\n` +
-                    tab(exp.intervals
-                        .map(([ a, b ]) =>
-                            `(x >= ${a} && x <= ${b})`
-                        )
-                        .join(` ||\n`),
-                        `        `
-                    ) + `\n` +
-                    `    ) ? begin + 1 : null\n` +
-                    `})(${begin})`
-                )
-            }
-            else if (exp.symbol === AndExpression.symbol) {
-                return (
-                    `(begin => {\n` +
-                    `    let last = begin\n` +
-                    `    \n` +
-                    tab(exp.expressions
-                        .map((x, i) =>
-                            `const end${i} = ${stringify(x, `last`)}\n` +
-                            `if (end${i} == null) return null\n` +
-                            `last = end${i}\n`
-                        )
-                        .join(`\n`)
-                    ) + `\n` +
-                    `    return last\n` +
-                    `})(${begin})`
-                )
-            }
-            else if (exp.symbol === OrExpression.symbol) {
-                return (
-                    `(begin => {\n` +
-                    tab(exp.expressions
-                        .map((x, i) =>
-                            `const end${i} = ${stringify(x)}\n` +
-                            `if (end${i} != null) return end${i}\n`
-                        )
-                        .join(`\n`)
-                    ) + `\n` +
-                    `    return null\n` +
-                    `})(${begin})`
-                )
-            }
-            else if (exp.symbol === FieldExpression.symbol) {
-                return stringify(exp.expression, begin)
-            }
-            else assert_never(exp, new Error) // @todo
-        }
-
-        const header = (
-            `class Location {\n` +
-            `    public readonly offset : number\n` +
-            `    public readonly line   = 0\n` +
-            `    public readonly column = 0\n` +
-            `    \n` +
-            `    public constructor({\n` +
-            `        offset,\n` +
-            `    } : {\n` +
-            `        offset : number\n` +
-            `    }) {\n` +
-            `        this.offset = offset\n` +
-            `    }\n` +
-            `}\n` +
-            `\n` +
-            `class Expression {\n` +
-            `    public readonly begin : Location\n` +
-            `    public readonly end   : Location\n` +
-            `    \n` +
-            `    public constructor({\n` +
-            `        begin,\n` +
-            `        end,\n` +
-            `    } : {\n` +
-            `        begin : Location\n` +
-            `        end   : Location\n` +
-            `    }) {\n` +
-            `        this.begin = begin\n` +
-            `        this.end   = end\n` +
-            `    }\n` +
-            `}\n`
-        )
-
-        const classes = rules
-            .map(rule => {
-                const { class_name, fields } = rule
-
-                return (
-                    `export class ${class_name} extends Expression {\n` +
-                    `    public static readonly symbol = Symbol("${class_name}.symbol")\n` +
-                    (fields.length > 0 ? (
-                    `    \n` +
-                    tab(fields.map(([ field, type ]) =>
-                        `public readonly ${field} : ${type}`
-                    ).join(`\n`)) + `\n` +
-                    `    \n` +
-                    `    public constructor({\n` +
-                    tab(fields.map(([ field ]) =>
-                        `    ${field},`
-                    ).join(`\n`)) + `\n` +
-                    `        begin,\n` +
-                    `        end,\n` +
-                    `    } : {\n` +
-                    tab(fields.map(([ field, type ]) =>
-                        `    ${field} : ${type}`
-                    ).join(`\n`)) + `\n` +
-                    `        begin : Location\n` +
-                    `        end   : Location\n` +
-                    `    }) {\n` +
-                    `        super({ begin, end })\n` +
-                    `        \n` +
-                    tab(fields.map(([ field ]) =>
-                        `    this.${field} = ${field}`
-                    ).join(`\n`)) + `\n` +
-                    `    }\n`
-                    ) : ``) +
-                    `    \n` +
-                    `    public get symbol() : typeof ${class_name}.symbol {\n` +
-                    `        return ${class_name}.symbol\n` +
-                    `    }\n` +
-                    `}\n`
-                )
-            })
-            .join(`\n`)
-
-        const functions = rules
-            .map(rule => {
-                const { class_name, fields } = rule
-
-                return (
-                    `export function parse_${rule.name}(text : string, begin : number) : ${class_name} | null {\n` +
-                    (fields.length > 0 ? (
-                    tab(fields.map(([ field, type ]) =>
-                        `let _${field} : ${type} | null = null`
-                    ).join(`\n`)) + `\n` +
-                    `    \n`) : ``) +
-                    tab(`const end = ${stringify(rule.expression)}\n`) +
-                    `    \n` +
-                    `    if (end == null) return null\n` +
-                    `    \n` +
-                    (fields.length > 0 ? (
-                    tab(fields.map(([ field ]) =>
-                        `if (!_${field}) throw new Error // @todo`
-                    ).join(`\n`)) + `\n` +
-                    `    \n`) : ``) +
-                    `    return new ${class_name}({\n` +
-                    tab(fields.map(([ field ]) =>
-                        `    ${field} : _${field},`
-                    ).join(`\n`)) + `\n` +
-                    `        begin : new Location({ offset : begin }),\n` +
-                    `        end   : new Location({ offset : end }),\n` +
-                    `    })\n` +
-                    `}\n`
-                )
-            })
-            .join(`\n`)
-
-        const exports = rules
-            .map(({ name, class_name, exports_name }) => {
-                return (
-                    `export { ${class_name} as ${exports_name} }\n`
-                )
-            })
-            .join(`\n`)
-
-        return (
-            header +
-            `\n` +
-            classes +
-            `\n` +
-            functions +
-            `\n` +
-            exports
-        )
-    }
-}*/
 
 export class Parser {
     public readonly rules : readonly RuleExpression[]
@@ -537,8 +333,28 @@ export class Parser {
     }
 }
 
-export function rule(name : string, expression : ExpressionUnion | null = null) {
-    return new RuleExpression({ name, expression })
+export function rule(name : string) : RuleExpression;
+export function rule(name : string, expression : ExpressionUnion | null) : RuleExpression;
+export function rule(class_name : string, name : string, expression : ExpressionUnion | null) : RuleExpression;
+export function rule(...params : [ string ] | [string, ExpressionUnion | null] | [string, string, ExpressionUnion | null]) {
+    switch (params.length) {
+        case 1: {
+            const [ name ] = params
+
+            return new RuleExpression({ name })
+        } break
+        case 2: {
+            const [ name, expression ] = params
+
+            return new RuleExpression({ name, expression })
+        } break
+        case 3: {
+            const [ class_name, name, expression ] = params
+
+            return new RuleExpression({ name, class_name, expression })
+        } break
+        default: assert_never(params, new Error) // @todo
+    }
 }
 
 export function text(value : string) {
@@ -577,12 +393,82 @@ function tab1(text : string, level = 1) {
     return text.replace(/\n/g, `\n` + `    `.repeat(level))
 }
 
+function get_return_type(exp : ExpressionUnion) {
+    const visited = new Set<RuleExpression>()
+
+    function wrap_visit(exp : ExpressionUnion) {
+        const result = visit(exp)
+
+        return result != null && exp.symbol === OrExpression.symbol
+            ? `(${result})`
+            : result
+    }
+
+    function visit(exp : ExpressionUnion) : string | null {
+        switch (exp.symbol) {
+            case RuleExpression.symbol     : {
+                if (visited.has(exp)) return null
+
+                visited.add(exp)
+
+                if (exp.class_name != null) return exp.class_name
+
+                return visit(exp.expression)
+            } break
+            case SequenceExpression.symbol : {
+                const target = wrap_visit(exp.expression)
+
+                return target != null
+                    ? `${target}[]`
+                    : null
+            } break
+            case OptionalExpression.symbol : {
+                const target = visit(exp.expression)
+
+                return target != null
+                    ? `${target} | null`
+                    : null
+            } break
+            case TextExpression.symbol     : return null
+            case RangeExpression.symbol    : return null
+            case AndExpression.symbol      : {
+                const exps = exp.expressions
+                    .map(visit)
+                    .filter((x) : x is string => x != null)
+
+                return exps.length > 0
+                    ? `[ ${exps.join(`, `)} ]`
+                    : null
+            } break
+            case OrExpression.symbol       : {
+                const exps = exp.expressions
+                    .map(visit)
+                    .filter((x) : x is string => x != null)
+
+                    return exps.length > 0
+                        ? exps.join(` | `)
+                        : null
+            } break
+            case FieldExpression.symbol    : return visit(exp.expression)
+            default: assert_never(exp, new Error) // @todo
+        }
+    }
+
+    return wrap_visit(exp)
+}
+
 function scan_rules(root : RuleExpression) {
     const rules : RuleExpression[] = []
 
     function scan(exp : ExpressionUnion) : unknown {
         switch (exp.symbol) {
-            case RuleExpression.symbol     : return !rules.includes(exp) ? rules.push(exp) && scan(exp.expression) : null
+            case RuleExpression.symbol     : {
+                if (rules.includes(exp)) return
+
+                rules.push(exp)
+
+                scan(exp.expression)
+            } break
             case SequenceExpression.symbol : return scan(exp.expression)
             case OptionalExpression.symbol : return scan(exp.expression)
             case TextExpression.symbol     : return // do nothing
@@ -605,9 +491,14 @@ export function stringify_tree(root : RuleExpression) {
     return (
         CLASSES +
         `\n` +
-        rules.map(stringify_class).join(`\n`) +
+        rules
+            .filter(rule => rule.class_name !== null)
+            .map(stringify_class)
+            .join(`\n`) +
         `\n` +
-        rules.map(stringify_parser).join(`\n`) +
+        rules
+            .map(stringify_parser)
+            .join(`\n`) +
         `\n` +
         `export{}\n`
     )
@@ -622,7 +513,7 @@ function stringify_class(rule : RuleExpression) {
         `    \n` +
         (fields.length > 0 ?
         fields.map(field =>
-        `    public readonly ${field.name} : ${field.expression.class_name}\n`
+        `    public readonly ${field.name} : ${get_return_type(field)}\n`
         ).join(``) +
         `    \n`
         : ``) +
@@ -635,7 +526,7 @@ function stringify_class(rule : RuleExpression) {
         `        end,\n` +
         `    } : {\n` +
         fields.map(field =>
-        `        ${field.name} : ${field.expression.class_name}\n`
+        `        ${field.name} : ${get_return_type(field)}\n`
         ).join(``) +
         `        begin : Location\n` +
         `        end   : Location\n` +
@@ -658,23 +549,28 @@ function stringify_class(rule : RuleExpression) {
 
 function stringify_parser(rule : RuleExpression) {
     const { fields } = rule
+    let class_name = get_return_type(rule)
+
+    if (class_name == null) class_name = `Expression`
 
     return (
-        `export function ${rule.parser_name}(text : string, begin = 0) : ${rule.class_name} | null {\n` +
+        `export function ${rule.parser_name}(text : string, begin = 0) : ${class_name} | null {\n` +
         `    const res = ${tab1(stringify_expression(rule.expression))}\n` +
         `    \n` +
         `    if (!res) return null\n` +
         `    \n` +
-        (fields.length > 0 ?
+        (class_name != null && fields.length > 0 ?
         fields.map(field =>
         `    const ${field.name} = res${find_expression(field, rule.expression)}\n`
         ).join(``) +
         `    \n`
         : ``) +
-        `    return new ${rule.class_name}({\n` +
+        `    return new ${class_name}({\n` +
+        (class_name != null ?
         fields.map(field =>
         `        ${field.name},\n`
-        ).join(``) +
+        ).join(``)
+        : ``) +
         `        begin : res.begin,\n` +
         `        end   : res.end,\n` +
         `    })\n` +
@@ -703,25 +599,32 @@ function stringify_rule(exp : RuleExpression, begin = `begin`) {
 }
 
 function stringify_sequence(exp : SequenceExpression, begin = `begin`) {
+    const result = get_return_type(exp)
+
     return (
         `(begin => {\n` +
-        `    const expressions : ${exp.expression.class_name}[] = []\n` +
+        (result != null ?
+            `    const expressions : ${result} = []\n`
+        : ``) +
         `    let end = begin\n` +
         `    \n` +
         `    while (true) {\n` +
         `        const res = ${tab1(stringify_expression(exp.expression, `end`), 2)}\n` +
         `        \n` +
+        (result != null ?
         `        if (res == null) return new ArrayExpression({\n` +
         `            expressions,\n` +
-        `            begin : expressions.length > 0\n` +
-        `                ? expressions[0].begin\n` +
-        `                : new Location({ offset : begin }),\n` +
-        `            end   : expressions.length > 0\n` +
-        `                ? expressions[expressions.length - 1].end\n` +
-        `                : new Location({ offset : begin }),\n` +
-        `        })\n` +
+        `            begin : new Location({ offset : begin }),\n` +
+        `            end   : new Location({ offset : end }),\n` +
+        `        })\n` :
+        `        if (res == null) return new Expression({\n` +
+        `            begin : new Location({ offset : begin }),\n` +
+        `            end   : new Location({ offset : end }),\n` +
+        `        })\n`) +
         `        \n` +
-        `        expressions.push(res)\n` +
+        (result != null ?
+        `        expressions.push(res)\n`
+        : ``) +
         `        end  = res.end.offset\n` +
         `    }\n` +
         `})(${begin})`
@@ -813,11 +716,11 @@ function find_expression(target : ExpressionUnion, root : ExpressionUnion) : str
     if (target === root) return ``
 
     switch (root.symbol) {
-        case RuleExpression.symbol     : throw new Error // @todo
-        case SequenceExpression.symbol : throw new Error // @todo
-        case OptionalExpression.symbol : throw new Error // @todo
-        case TextExpression.symbol     : throw new Error // @todo
-        case RangeExpression.symbol    : throw new Error // @todo
+        case RuleExpression.symbol     : return null
+        case SequenceExpression.symbol : return null
+        case OptionalExpression.symbol : return null
+        case TextExpression.symbol     : return null
+        case RangeExpression.symbol    : return null
         case AndExpression.symbol      : {
             for (let i = 0; i < root.expressions.length; ++i) {
                 if (find_expression(target, root.expressions[i]) !== null) return `.expressions[${i}]`
@@ -825,8 +728,8 @@ function find_expression(target : ExpressionUnion, root : ExpressionUnion) : str
 
             return null
         }
-        case OrExpression.symbol       : throw new Error // @todo
-        case FieldExpression.symbol    : throw new Error // @todo
+        case OrExpression.symbol       : return null
+        case FieldExpression.symbol    : return null
         default: assert_never(root, new Error) // @todo
     }
 }
